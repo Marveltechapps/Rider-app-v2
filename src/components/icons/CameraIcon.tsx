@@ -1,0 +1,50 @@
+/**
+ * Camera Icon Component
+ * Icon for delivery proof photo
+ */
+
+import React from 'react';
+import Svg, { Path } from 'react-native-svg';
+import { ViewStyle } from 'react-native';
+
+interface CameraIconProps {
+  size?: number;
+  color?: string;
+  style?: ViewStyle;
+}
+
+export default function CameraIcon({
+  size = 21,
+  color = '#6A7282',
+  style,
+}: CameraIconProps) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 42 42"
+      fill="none"
+      style={style}
+    >
+      <Path
+        d="M0 21C0 9.40202 9.40202 0 21 0C32.598 0 42 9.40202 42 21C42 32.598 32.598 42 21 42C9.40202 42 0 32.598 0 21Z"
+        fill="#F3F4F6"
+      />
+      <Path
+        d="M22.7474 14C23.0631 14 23.3729 14.0854 23.644 14.2471C23.9151 14.4089 24.1374 14.6409 24.2874 14.9188L24.7126 15.7062C24.8626 15.9841 25.0849 16.2161 25.356 16.3779C25.6271 16.5396 25.9369 16.625 26.2526 16.625H28C28.4641 16.625 28.9092 16.8094 29.2374 17.1376C29.5656 17.4658 29.75 17.9109 29.75 18.375V26.25C29.75 26.7141 29.5656 27.1592 29.2374 27.4874C28.9092 27.8156 28.4641 28 28 28H14C13.5359 28 13.0908 27.8156 12.7626 27.4874C12.4344 27.1592 12.25 26.7141 12.25 26.25V18.375C12.25 17.9109 12.4344 17.4658 12.7626 17.1376C13.0908 16.8094 13.5359 16.625 14 16.625H15.7474C16.0627 16.625 16.3723 16.5398 16.6432 16.3784C16.9141 16.217 17.1364 15.9853 17.2865 15.708L17.7144 14.917C17.8645 14.6397 18.0868 14.408 18.3577 14.2466C18.6286 14.0852 18.9381 14 19.2535 14H22.7474Z"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M21 24.5C22.4497 24.5 23.625 23.3247 23.625 21.875C23.625 20.4253 22.4497 19.25 21 19.25C19.5503 19.25 18.375 20.4253 18.375 21.875C18.375 23.3247 19.5503 24.5 21 24.5Z"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+

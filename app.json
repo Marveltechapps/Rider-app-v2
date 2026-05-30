@@ -1,0 +1,67 @@
+{
+  "expo": {
+    "name": "Rider",
+    "slug": "Rider",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/images/selorg-delivery-partner-logo-clean.png",
+    "scheme": "rider",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.Rider",
+      "config": {
+        "googleMapsApiKey": "AIzaSyAa8QYUOOYJ8QHNxUe3_R3PwxRBRVE51ZY"
+      },
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
+    },
+    "android": {
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./src/assets/images/android-icon-foreground.png",
+        "backgroundImage": "./src/assets/images/android-icon-background.png",
+        "monochromeImage": "./src/assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.Rider",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAa8QYUOOYJ8QHNxUe3_R3PwxRBRVE51ZY"
+        }
+      }
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./src/assets/images/selorg-delivery-partner-logo-clean.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./src/assets/images/selorg-delivery-partner-logo-clean.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

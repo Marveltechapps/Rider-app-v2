@@ -1,0 +1,12 @@
+---
+description: Backend must not be added in this app; backend lives in selorg-dashboard-backend-v1.1 only
+alwaysApply: true
+---
+
+# No Backend in This App
+
+**Do not add backend code here.**
+
+All backend logic, APIs, and server-side code must be written only in **`selorg-dashboard-backend-v1.1/`** (at the workspace root).
+
+This app (rider_app) is frontend/client only. Call backend via the APIs exposed by `selorg-dashboard-backend-v1.1/`.

@@ -1,0 +1,48 @@
+/**
+ * Map View Icon Component
+ * Map view icon from Figma design
+ * Downloaded from Figma node-id: 13454:212
+ */
+
+import React from 'react';
+import Svg, { Path } from 'react-native-svg';
+import { ViewStyle } from 'react-native';
+
+interface MapViewIconProps {
+  size?: number;
+  color?: string;
+  style?: ViewStyle;
+}
+
+export default function MapViewIcon({
+  size = 28,
+  color = '#99A1AF',
+  style,
+}: MapViewIconProps) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 28 28"
+      style={style}
+    >
+      <Path
+        d="M23.3334 11.6667C23.3334 17.4918 16.8712 23.5585 14.7012 25.4322C14.4991 25.5842 14.253 25.6664 14.0001 25.6664C13.7471 25.6664 13.5011 25.5842 13.2989 25.4322C11.1289 23.5585 4.66675 17.4918 4.66675 11.6667C4.66675 9.19131 5.65008 6.81734 7.40042 5.067C9.15076 3.31666 11.5247 2.33333 14.0001 2.33333C16.4754 2.33333 18.8494 3.31666 20.5997 5.067C22.3501 6.81734 23.3334 9.19131 23.3334 11.6667Z"
+        stroke={color}
+        strokeWidth="2.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <Path
+        d="M14 15.1667C15.933 15.1667 17.5 13.5997 17.5 11.6667C17.5 9.73368 15.933 8.16667 14 8.16667C12.067 8.16667 10.5 9.73368 10.5 11.6667C10.5 13.5997 12.067 15.1667 14 15.1667Z"
+        stroke={color}
+        strokeWidth="2.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+

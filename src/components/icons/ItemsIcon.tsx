@@ -1,0 +1,54 @@
+/**
+ * Items Icon Component
+ * Shopping bag/box icon for item count
+ * Exact SVG from Figma
+ */
+
+import React from 'react';
+import Svg, { Path } from 'react-native-svg';
+import { ViewStyle } from 'react-native';
+
+interface ItemsIconProps {
+  size?: number;
+  color?: string;
+  style?: ViewStyle;
+}
+
+export default function ItemsIcon({ 
+  size = 14, 
+  color = '#99A1AF',
+  style 
+}: ItemsIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 14 14" fill="none" style={style}>
+      <Path
+        d="M5.95833 11.7705C6.12302 11.8656 6.30984 11.9157 6.5 11.9157C6.69016 11.9157 6.87698 11.8656 7.04167 11.7705L10.8333 9.60385C10.9979 9.50886 11.1345 9.37228 11.2296 9.2078C11.3247 9.04333 11.3748 8.85674 11.375 8.66677V4.33343C11.3748 4.14346 11.3247 3.95687 11.2296 3.79239C11.1345 3.62792 10.9979 3.49134 10.8333 3.39635L7.04167 1.22968C6.87698 1.1346 6.69016 1.08454 6.5 1.08454C6.30984 1.08454 6.12302 1.1346 5.95833 1.22968L2.16667 3.39635C2.00214 3.49134 1.86549 3.62792 1.77042 3.79239C1.67534 3.95687 1.62519 4.14346 1.625 4.33343V8.66677C1.62519 8.85674 1.67534 9.04333 1.77042 9.2078C1.86549 9.37228 2.00214 9.50886 2.16667 9.60385L5.95833 11.7705Z"
+        stroke={color}
+        strokeWidth="1.02083"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M6.5 11.9167V6.5"
+        stroke={color}
+        strokeWidth="1.02083"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M1.78253 3.79149L6.50044 6.49983L11.2184 3.79149"
+        stroke={color}
+        strokeWidth="1.02083"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M4.0625 2.31314L8.9375 5.10272"
+        stroke={color}
+        strokeWidth="1.02083"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}

@@ -1,0 +1,205 @@
+{
+  "info": {
+    "name": "Rider App API",
+    "description": "Sample 5 endpoints for testing the Rider app backend at api.selorg.com. Rider app uses /api/signin for auth (rider_v2_backend) and /api/v1/auth, /api/v1/orders for unified backend. If /api/signin returns 404, your deployment may use the unified server only - try the alternative Auth (v1) folder.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "serverRoot",
+      "value": "https://api.selorg.com"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "mobileNumber",
+      "value": "9876543210"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{serverRoot}}/health",
+          "host": [
+            "{{serverRoot}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "description": "Backend server health check."
+    },
+    {
+      "name": "2. Auth - Send OTP (Signin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mobileNumber\": \"{{mobileNumber}}\"\n}"
+        },
+        "url": {
+          "raw": "{{serverRoot}}/api/signin/send-otp",
+          "host": [
+            "{{serverRoot}}"
+          ],
+          "path": [
+            "api",
+            "signin",
+            "send-otp"
+          ]
+        }
+      },
+      "description": "Rider signin: Request OTP. Uses mobileNumber (10 digits). Requires rider_v2_backend or proxy to it. If 404, use Auth (v1) - Send OTP instead."
+    },
+    {
+      "name": "3. Auth - Verify OTP (Signin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mobileNumber\": \"{{mobileNumber}}\",\n  \"otp\": \"1234\"\n}"
+        },
+        "url": {
+          "raw": "{{serverRoot}}/api/signin/verify-otp",
+          "host": [
+            "{{serverRoot}}"
+          ],
+          "path": [
+            "api",
+            "signin",
+            "verify-otp"
+          ]
+        }
+      },
+      "description": "Verify OTP and receive JWT. Token at top level. Saves to {{token}} automatically.",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json.token) {",
+              "  pm.collectionVariables.set('token', json.token);",
+              "  console.log('Token saved to collection variable');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Auth - Resend OTP (Signin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mobileNumber\": \"{{mobileNumber}}\"\n}"
+        },
+        "url": {
+          "raw": "{{serverRoot}}/api/signin/resend-otp",
+          "host": [
+            "{{serverRoot}}"
+          ],
+          "path": [
+            "api",
+            "signin",
+            "resend-otp"
+          ]
+        }
+      },
+      "description": "Resend OTP. User must exist. Per OTP_PROCESS_WORKFLOW.md."
+    },
+    {
+      "name": "5. Auth - Get Me (v1)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": "Required."
+          }
+        ],
+        "url": {
+          "raw": "{{serverRoot}}/api/v1/auth/me",
+          "host": [
+            "{{serverRoot}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "me"
+          ]
+        }
+      },
+      "description": "Get current rider profile. Requires Bearer token from Verify OTP."
+    },
+    {
+      "name": "6. Orders - List Orders (v1)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "description": "Required."
+          }
+        ],
+        "url": {
+          "raw": "{{serverRoot}}/api/v1/orders/admin/orders",
+          "host": [
+            "{{serverRoot}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "orders",
+            "admin",
+            "orders"
+          ]
+        }
+      },
+      "description": "List orders for the authenticated rider. Supports ?status= and ?warehouseCode= query params."
+    }
+  ]
+}
