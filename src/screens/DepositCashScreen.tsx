@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     Alert,
+    ActivityIndicator,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -14,6 +15,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Text from '../components/common/Text';
 import ArrowUpRightIcon from '../components/icons/ArrowUpRightIcon';
@@ -24,13 +26,16 @@ import UPIIcon from '../components/icons/UPIIcon';
 import { Theme } from '../constants/Theme';
 import { useConfigWithDefaults } from '../contexts';
 import { scale, verticalScale } from '../utils/responsive';
+import { depositCash } from '../api/cash';
 
 export default function DepositCashScreen() {
   const router = useRouter();
   const config = useConfigWithDefaults();
+  const queryClient = useQueryClient();
   const MAX_AMOUNT = config.depositMaxAmount;
   const [amount, setAmount] = useState<string>('0');
   const [selectedMethod, setSelectedMethod] = useState<'upi' | 'cash'>('upi');
+  const [submitting, setSubmitting] = useState(false);
 
   const handlePayFullAmount = () => {
     setAmount(MAX_AMOUNT.toString());
@@ -63,10 +68,21 @@ export default function DepositCashScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
-          onPress: () => {
-            Alert.alert('Success', 'Deposit request submitted successfully!');
-            // Navigate to home screen to show available orders
-            router.replace('/(tabs)');
+          onPress: async () => {
+            setSubmitting(true);
+            try {
+              await depositCash({
+                amount: amountNum,
+                method: selectedMethod === 'upi' ? 'upi' : 'cash',
+              });
+              queryClient.invalidateQueries({ queryKey: ['cash'] });
+              Alert.alert('Success', 'Deposit recorded successfully!');
+              router.replace('/(tabs)');
+            } catch (e) {
+              Alert.alert('Deposit failed', e instanceof Error ? e.message : 'Could not record deposit');
+            } finally {
+              setSubmitting(false);
+            }
           },
         },
       ]
@@ -176,14 +192,9 @@ export default function DepositCashScreen() {
             <Pressable
               style={[
                 styles.methodCard,
-                styles.methodCardDisabled,
                 selectedMethod === 'cash' && styles.methodCardSelected,
               ]}
-              onPress={() => {
-                // Cash deposit is disabled for now
-                Alert.alert('Coming Soon', 'Cash deposit option will be available soon.');
-              }}
-              disabled={true}
+              onPress={() => setSelectedMethod('cash')}
             >
               <View style={styles.methodIconContainer}>
                 <CashDepositMethodIcon size={scale(24.5)} color="#6B7280" />

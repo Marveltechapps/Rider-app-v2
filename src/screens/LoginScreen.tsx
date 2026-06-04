@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { requestOtp } from '../api/auth';
+import { requestOtp, existingUserLogin } from '../api/auth';
 import { getLegalConfig, type LoginLegalConfig } from '../api/legal';
 import { sanitizePhoneDigits } from '../utils/profileValidation';
 import AppLogo from '../components/common/AppLogo';
@@ -91,6 +91,28 @@ export default function LoginScreen() {
     setOtpError(null);
     setSendingOtp(true);
     try {
+      const existing = await existingUserLogin(fullPhoneNumber);
+      if (existing.canSkipOtp && existing.token && existing.riderId) {
+        const { setStoredTokens, getStoredAccessToken } = await import('../api/storage');
+        await setStoredTokens(existing.token, existing.token, existing.riderId);
+        for (let i = 0; i < 20; i++) {
+          const stored = await getStoredAccessToken();
+          if (stored) break;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        setAuthFromVerify({
+          riderId: existing.riderId,
+          name: existing.name ?? undefined,
+          phoneNumber: existing.phoneNumber ?? fullPhoneNumber,
+          onboardingComplete: !!existing.onboardingComplete,
+        });
+        if (existing.onboardingComplete) {
+          router.replace('/(tabs)');
+        } else {
+          router.replace('/search-location');
+        }
+        return;
+      }
       await requestOtp(fullPhoneNumber);
       router.push({
         pathname: '/otp',
@@ -107,8 +129,6 @@ export default function LoginScreen() {
   const handleBack = () => {
     if (router.canGoBack()) {
       router.back();
-    } else {
-      router.replace('/splash');
     }
   };
 

@@ -1,68 +1,40 @@
 /**
  * Document Types
- * Type definitions for rider documents
  */
 
-export type DocumentStatus = 'verified' | 'pending' | 'expired';
+import type { KycStatusItem } from '../api/kyc';
+
+export type DocumentStatus = 'verified' | 'pending' | 'under_review' | 'rejected';
 
 export interface RiderDocument {
   id: string;
-  name: string;          // e.g. "Aadhar Card"
+  name: string;
   status: DocumentStatus;
-  updatedOn: string;     // human-readable date, e.g. "20 Nov 2024"
-  fileName: string;      // e.g. "aadhar_card_front_back.pdf"
+  /** Raw backend status for navigation / API */
+  apiStatus?: KycStatusItem['status'];
+  updatedOn: string;
+  fileName: string;
+  rejectedReason?: string;
 }
 
-// Mock document data
-export const DOCUMENTS: RiderDocument[] = [
-  {
-    id: '1',
-    name: 'Aadhar Card',
-    status: 'verified',
-    updatedOn: '20 Nov 2024',
-    fileName: 'aadhar_card_front_back.pdf',
-  },
-  {
-    id: '2',
-    name: 'PAN Card',
-    status: 'verified',
-    updatedOn: '20 Nov 2024',
-    fileName: 'pan_card.jpg',
-  },
-  {
-    id: '3',
-    name: 'Driving License',
-    status: 'verified',
-    updatedOn: '20 Nov 2024',
-    fileName: 'driving_license.pdf',
-  },
-  {
-    id: '4',
-    name: 'Vehicle RC',
-    status: 'pending',
-    updatedOn: 'Today',
-    fileName: 'vehicle_rc.pdf',
-  },
-  {
-    id: '5',
-    name: 'Vehicle Insurance',
-    status: 'expired',
-    updatedOn: '10 Oct 2023',
-    fileName: 'insurance_policy.pdf',
-  },
-];
+export interface DocumentStatusCounts {
+  total: number;
+  verified: number;
+  pending: number;
+  underReview: number;
+  rejected: number;
+}
 
-// Get document counts by status
-export const getDocumentCounts = (documents: RiderDocument[]) => {
+export function getDocumentCounts(documents: RiderDocument[]): DocumentStatusCounts {
   return {
-    verified: documents.filter(d => d.status === 'verified').length,
-    pending: documents.filter(d => d.status === 'pending').length,
-    expired: documents.filter(d => d.status === 'expired').length,
+    total: documents.length,
+    verified: documents.filter((d) => d.status === 'verified').length,
+    pending: documents.filter((d) => d.status === 'pending').length,
+    underReview: documents.filter((d) => d.status === 'under_review').length,
+    rejected: documents.filter((d) => d.status === 'rejected').length,
   };
-};
+}
 
-// Get documents by status
-export const getDocumentsByStatus = (documents: RiderDocument[], status: DocumentStatus) => {
-  return documents.filter(d => d.status === status);
-};
-
+export function getDocumentsByStatus(documents: RiderDocument[], status: DocumentStatus) {
+  return documents.filter((d) => d.status === status);
+}

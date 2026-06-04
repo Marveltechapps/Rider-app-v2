@@ -31,6 +31,8 @@ export interface RiderProfile {
     bankName?: string;
   };
   upiDetails?: { upiId?: string; accountHolderName?: string };
+  primaryPayoutMethod?: 'bank' | 'upi';
+  updatedAt?: string;
   preferredLocation?: PreferredLocation;
   earnings?: { totalEarned: number; pendingAmount: number; lastPayoutAt?: string };
 }
@@ -48,6 +50,7 @@ export async function getRider(riderId: string): Promise<RiderResponse> {
 export async function updateRider(riderId: string, updates: {
   name?: string;
   email?: string;
+  phoneNumber?: string;
   vehicle?: { type?: string; registrationNumber?: string; model?: string };
   bankDetails?: {
     accountNumber?: string;
@@ -82,4 +85,27 @@ export async function updateRiderPreferredLocation(
   }
 ): Promise<RiderResponse> {
   return api.put<RiderResponse>(`/api/v1/delivery/riders/${riderId}/preferred-location`, data);
+}
+
+export interface RiderStats {
+  riderId: string;
+  name: string;
+  stats: {
+    averageRating?: number;
+    totalRatings?: number;
+    acceptanceRate?: string;
+    onTimeDelivery?: string;
+    totalDeliveries?: number;
+    completedDeliveries?: number;
+  };
+  earnings?: { totalEarned?: number; pendingAmount?: number };
+  lifetimeEarnings?: number;
+  floatingCash?: number;
+  status?: string;
+  availability?: string;
+}
+
+/** Rider performance stats for profile screen */
+export async function getRiderStats(riderId: string): Promise<{ stats: RiderStats }> {
+  return api.get<{ stats: RiderStats }>(`/api/v1/delivery/riders/${riderId}/stats`);
 }

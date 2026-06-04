@@ -16,12 +16,12 @@ const deliveryCompleteStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: Theme.colors.primaryMedium, // #32C96A
   },
-  topHeader: {
-    backgroundColor: Theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+  bottomFooter: {
+    flexShrink: 0,
     paddingHorizontal: scale(21),
-    paddingVertical: verticalScale(12),
+    paddingTop: verticalScale(16),
+    paddingBottom: verticalScale(8),
+    backgroundColor: Theme.colors.primaryMedium,
   },
   backgroundCircles: {
     position: 'absolute',
@@ -192,21 +192,22 @@ const deliveryCompleteStyles = StyleSheet.create({
   },
   homeButton: {
     width: '100%',
+    minHeight: scale(52),
     backgroundColor: Theme.colors.white,
-    borderRadius: scale(8),
-    paddingVertical: scale(6),
+    borderRadius: scale(12.75),
+    paddingVertical: scale(14),
     paddingHorizontal: scale(16),
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
   },
   homeButtonText: {
-    fontSize: scale(15.75),
-    lineHeight: scale(24.5), // 15.75 * 1.5555555555555556
+    fontSize: scale(16),
+    lineHeight: scale(24),
     fontWeight: '700',
     color: Theme.colors.primaryMedium,
   },

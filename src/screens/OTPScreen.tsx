@@ -30,7 +30,7 @@ import Button from '../components/common/Button';
 import BackIcon from '../components/icons/BackIcon';
 import ArrowRightIcon from '../components/icons/ArrowRightIcon';
 import { useUser } from '../contexts';
-import { requestOtp, verifyOtp, type OnboardingStateResponse } from '../api/auth';
+import { requestOtp, verifyOtp, resendOtp, type OnboardingStateResponse } from '../api/auth';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -184,7 +184,7 @@ export default function OTPScreen({ phoneNumber = '+91 98765 43210' }: OTPScreen
     inputRefs.current[0]?.focus();
     setSendingOtp(true);
     try {
-      await requestOtp(phoneNumber as string);
+      await resendOtp(phoneNumber as string);
     } catch (err: unknown) {
       setOtpError(err instanceof Error ? err.message : 'Failed to resend OTP');
     } finally {

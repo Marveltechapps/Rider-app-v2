@@ -20,10 +20,12 @@ import Text from '../components/common/Text';
 import CircleInfoIcon from '../components/icons/CircleInfoIcon';
 import Header from '../components/layout/Header';
 import PaymentSegmentControl, { PaymentTab } from '../components/PaymentSegmentControl';
+import { usePayment } from '../contexts/PaymentContext';
 import { useUser } from '../contexts/UserContext';
+import { normalizeRiderResponse, riderProfileQueryKey } from '../utils/riderProfileQuery';
 import updatePaymentStyles from '../styles/updatePaymentStyles';
 import { BankDetails, hasCompleteBankDetails, hasCompleteUpiDetails, UpiDetails } from '../types/payment';
-import { guessBankNameFromIfsc } from '../utils/ifscBankName';
+import { fetchBankNameFromIfsc, guessBankNameFromIfsc } from '../utils/ifscBankName';
 import {
   parsePaymentValidationFromApi,
   PaymentFieldErrors,
@@ -52,6 +54,7 @@ export default function UpdatePaymentDetailsScreen() {
   const queryClient = useQueryClient();
   const params = useLocalSearchParams();
   const { userData } = useUser();
+  const { syncPaymentFromRider, updateBankDetails, updateUpiDetails } = usePayment();
   const riderId = userData.riderId;
 
   const [activeTab, setActiveTab] = useState<PaymentTab>('bank');
@@ -75,10 +78,10 @@ export default function UpdatePaymentDetailsScreen() {
   );
 
   const { data: riderResponse } = useQuery({
-    queryKey: ['rider', 'profile', riderId],
-    queryFn: () => getRider(riderId!),
+    queryKey: riderProfileQueryKey(riderId),
+    queryFn: async () => normalizeRiderResponse(await getRider(riderId!)),
     enabled: !!riderId,
-    staleTime: 30 * 1000,
+    staleTime: 0,
   });
 
   useFocusEffect(
@@ -138,8 +141,29 @@ export default function UpdatePaymentDetailsScreen() {
       });
     },
     onSuccess: (res) => {
-      queryClient.setQueryData(['rider', 'profile', riderId], res);
-      router.push({
+      const normalized = normalizeRiderResponse(res);
+      queryClient.setQueryData(riderProfileQueryKey(riderId), normalized);
+      void queryClient.invalidateQueries({ queryKey: riderProfileQueryKey(riderId) });
+
+      if (normalized.rider) {
+        syncPaymentFromRider(normalized.rider);
+      } else if (activeTab === 'bank') {
+        const bankName =
+          bankForm.bankName.trim() || guessBankNameFromIfsc(bankForm.ifscCode) || 'Bank account';
+        updateBankDetails({
+          accountHolderName: bankForm.accountHolderName.trim(),
+          accountNumber: sanitizeAccountNumber(bankForm.accountNumber),
+          ifscCode: sanitizeIfsc(bankForm.ifscCode),
+          bankName,
+        });
+      } else {
+        updateUpiDetails({
+          accountHolderName: upiForm.accountHolderName.trim(),
+          upiId: sanitizeUpiId(upiForm.upiId),
+        });
+      }
+
+      router.replace({
         pathname: '/payment-verify-success',
         params: {
           method: activeTab,
@@ -297,31 +321,37 @@ export default function UpdatePaymentDetailsScreen() {
                   <FormInput
                     label="IFSC Code"
                     value={bankForm.ifscCode}
-                    placeholder="e.g. HDFC0001234"
+                    placeholder="Enter IFSC code"
                     onChangeText={(text) => {
-                      setBankForm((prev) => ({ ...prev, ifscCode: sanitizeIfsc(text) }));
+                      const code = sanitizeIfsc(text);
+                      setBankForm((prev) => ({ ...prev, ifscCode: code }));
                       if (bankErrors.ifscCode) {
                         setBankErrors((prev) => ({ ...prev, ifscCode: undefined }));
+                      }
+                      if (code.length === 11) {
+                        fetchBankNameFromIfsc(code).then((name) => {
+                          if (name) setBankForm((prev) => ({ ...prev, bankName: name }));
+                        });
                       }
                     }}
                     error={bankErrors.ifscCode}
                     autoCapitalize="characters"
                     maxLength={11}
                     height={44}
-                    rightElement={
-                      <TouchableOpacity
-                        style={updatePaymentStyles.findIfscButton}
-                        onPress={() => {
-                          setSubmitError('Use your bank passbook, cheque, or net banking to find your branch IFSC.');
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Text variant="caption" color="#32C96A" style={updatePaymentStyles.findIfscText}>
-                          FIND IFSC
-                        </Text>
-                      </TouchableOpacity>
-                    }
                   />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSubmitError(
+                        'Use your bank passbook, cheque, or net banking to find your branch IFSC.'
+                      );
+                    }}
+                    activeOpacity={0.7}
+                    style={updatePaymentStyles.ifscHelpLink}
+                  >
+                    <Text variant="caption" color="#155DFC" style={updatePaymentStyles.ifscHelpLinkText}>
+                      How to find your IFSC?
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <View style={updatePaymentStyles.formContent}>
@@ -344,7 +374,7 @@ export default function UpdatePaymentDetailsScreen() {
                   <FormInput
                     label="UPI ID"
                     value={upiForm.upiId}
-                    placeholder="yourname@bank"
+                    placeholder="Enter UPI ID"
                     onChangeText={(text) => {
                       setUpiForm((prev) => ({ ...prev, upiId: text }));
                       setIsUpiVerified(false);
@@ -356,18 +386,17 @@ export default function UpdatePaymentDetailsScreen() {
                     autoCapitalize="none"
                     keyboardType="email-address"
                     height={44}
-                    rightElement={
-                      <TouchableOpacity
-                        style={updatePaymentStyles.verifyButton}
-                        onPress={handleVerifyUpi}
-                        activeOpacity={0.7}
-                      >
-                        <Text variant="caption" color="#32C96A" style={updatePaymentStyles.verifyButtonText}>
-                          VERIFY
-                        </Text>
-                      </TouchableOpacity>
-                    }
                   />
+
+                  <TouchableOpacity
+                    style={updatePaymentStyles.verifyUpiButton}
+                    onPress={handleVerifyUpi}
+                    activeOpacity={0.8}
+                  >
+                    <Text variant="bodySm" style={updatePaymentStyles.verifyUpiButtonText}>
+                      Verify UPI ID
+                    </Text>
+                  </TouchableOpacity>
 
                   {isUpiVerified ? (
                     <Text variant="caption" color="#32C96A" style={updatePaymentStyles.verificationNote}>

@@ -1,4 +1,4 @@
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,13 +11,15 @@ import { Colors as BrandColors } from '../../src/constants/Colors';
 import { Theme } from '../../src/constants/Theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { riderWebSocketService } from '../../src/services/websocket.service';
+import { useRiderLocationSync } from '../../src/hooks/useRiderLocationSync';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const { authLoaded, isLoggedIn, userData } = useUser();
-  const router = useRouter();
   const queryClient = useQueryClient();
+
+  useRiderLocationSync(userData?.riderId, isLoggedIn && !!userData?.onboardingComplete);
 
   // WebSocket: connect once when logged in, stay connected across all tabs, disconnect only on logout
   useEffect(() => {
@@ -26,9 +28,14 @@ export default function TabLayout() {
       return;
     }
     riderWebSocketService.connect(userData.riderId);
-    const handler = () => {
+    const handler = (payload: unknown) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['rider-home'] });
+      const p = payload as { orderId?: string; orderNumber?: string } | null;
+      const activeId = p?.orderId || p?.orderNumber;
+      if (activeId) {
+        void prefetchActiveOrder(queryClient, activeId);
+      }
     };
     riderWebSocketService.on('orders:refresh', handler);
     return () => {
@@ -37,18 +44,8 @@ export default function TabLayout() {
     };
   }, [userData?.riderId, queryClient]);
 
-  // When not logged in, only show loading; AuthGuard performs the single redirect to /login (avoids double navigation)
-  // When onboarding incomplete, redirect to onboarding
-  useEffect(() => {
-    if (!authLoaded) return;
-    if (!isLoggedIn) return;
-    if (!userData?.onboardingComplete) {
-      router.replace('/search-location');
-    }
-  }, [authLoaded, isLoggedIn, userData?.onboardingComplete, router]);
-
-  if (!authLoaded || !isLoggedIn || !userData?.onboardingComplete) {
-    return (
+  // Onboarding routing is handled by app/index + AuthGuard — do NOT redirect to Select City here.
+  if (!authLoaded || !isLoggedIn) {    return (
       <View style={tabStyles.loadingContainer}>
         <ActivityIndicator size="large" color={Theme.colors.primary} />
       </View>

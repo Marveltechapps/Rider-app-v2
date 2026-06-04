@@ -4,8 +4,9 @@
  * Matches Figma design exactly
  */
 
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useConfigWithDefaults } from '../contexts';
@@ -18,25 +19,81 @@ import MoneyIcon from '../components/icons/MoneyIcon';
 import PackageIcon from '../components/icons/PackageIcon';
 import PhoneIcon from '../components/icons/PhoneIcon';
 import Header from '../components/layout/Header';
+import { createIncident } from '../api/incidents';
+import { fetchMySupportChat } from '../api/supportChat';
+import { supportChatSocket } from '../services/supportChatSocket';
+import * as Location from 'expo-location';
 import helpSupportStyles from '../styles/helpSupportStyles';
 import { scale } from '../utils/responsive';
 
 export default function HelpSupportScreen() {
   const router = useRouter();
   const config = useConfigWithDefaults();
+  const [chatUnread, setChatUnread] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      fetchMySupportChat()
+        .then((d) => {
+          if (!cancelled) setChatUnread(d.conversation.riderUnreadCount ?? 0);
+        })
+        .catch(() => {});
+      supportChatSocket.connect();
+      const onRealtime = (payload: { conversation?: { riderUnreadCount?: number } }) => {
+        if (payload?.conversation?.riderUnreadCount != null) {
+          setChatUnread(payload.conversation.riderUnreadCount);
+        }
+      };
+      supportChatSocket.on('support:message', onRealtime);
+      supportChatSocket.on('support:conversation:updated', onRealtime);
+      return () => {
+        cancelled = true;
+        supportChatSocket.off('support:message', onRealtime);
+        supportChatSocket.off('support:conversation:updated', onRealtime);
+      };
+    }, [])
+  );
 
   const handleLiveChat = useCallback(() => {
     router.push('/chat' as any);
   }, [router]);
 
   const handleEmergencySOS = useCallback(() => {
-    console.log('Emergency SOS');
     Alert.alert(
       'Emergency SOS',
-      'This will alert emergency services. Continue?',
+      'This will alert our safety team and emergency services. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Call Emergency', style: 'destructive', onPress: () => Linking.openURL('tel:911') }
+        {
+          text: 'Send SOS',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              let location: { lat: number; lng: number } | undefined;
+              try {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                  const loc = await Location.getCurrentPositionAsync({});
+                  location = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+                }
+              } catch {
+                // Location optional
+              }
+              await createIncident({
+                type: 'safety_concern',
+                description: 'Emergency SOS triggered by rider from Help & Support screen.',
+                priority: 'urgent',
+                location,
+              });
+              Alert.alert('SOS Sent', 'Our safety team has been notified.');
+              Linking.openURL('tel:112').catch(() => {});
+            } catch {
+              Alert.alert('SOS failed', 'Could not send alert. Call emergency services directly.');
+              Linking.openURL('tel:112').catch(() => {});
+            }
+          },
+        },
       ]
     );
   }, []);
@@ -83,16 +140,25 @@ export default function HelpSupportScreen() {
       >
         {/* Quick Action Buttons */}
         <View style={helpSupportStyles.quickActions}>
-          <TouchableOpacity
-            style={helpSupportStyles.liveChatButton}
-            onPress={handleLiveChat}
-            activeOpacity={0.8}
-          >
-            <ChatIcon size={scale(28)} color="#FFFFFF" />
-            <Text variant="body" style={helpSupportStyles.liveChatText}>
-              Live Chat
-            </Text>
-          </TouchableOpacity>
+          <View style={helpSupportStyles.liveChatButtonWrap}>
+            {chatUnread > 0 && (
+              <View style={helpSupportStyles.liveChatUnreadBadge}>
+                <Text style={helpSupportStyles.liveChatUnreadText}>
+                  {chatUnread > 99 ? '99+' : chatUnread}
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={helpSupportStyles.liveChatButton}
+              onPress={handleLiveChat}
+              activeOpacity={0.8}
+            >
+              <ChatIcon size={scale(28)} color="#FFFFFF" />
+              <Text variant="body" style={helpSupportStyles.liveChatText}>
+                Live Chat Support
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={helpSupportStyles.emergencyButton}
@@ -114,62 +180,61 @@ export default function HelpSupportScreen() {
             Contact Support
           </Text>
 
-          {/* Call Support */}
-          <TouchableOpacity
-            style={helpSupportStyles.contactItem}
-            onPress={handleCallSupport}
-            activeOpacity={0.7}
-          >
-            <View style={helpSupportStyles.contactIconContainer}>
-              <PhoneIcon size={scale(17.5)} color="#32C96A" />
-            </View>
-            <View style={helpSupportStyles.contactInfo}>
-              <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>
-                Call Support
-              </Text>
-              <Text variant="bodySm" color="#6A7282" style={helpSupportStyles.contactValue}>
-                {config.supportPhone} (24/7)
-              </Text>
-            </View>
-          </TouchableOpacity>
+          <View style={helpSupportStyles.contactList}>
+            <TouchableOpacity
+              style={helpSupportStyles.contactItem}
+              onPress={handleCallSupport}
+              activeOpacity={0.7}
+            >
+              <View style={helpSupportStyles.contactIconContainer}>
+                <PhoneIcon size={scale(17.5)} color="#32C96A" />
+              </View>
+              <View style={helpSupportStyles.contactInfo}>
+                <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>
+                  Call Support
+                </Text>
+                <Text variant="bodySm" color="#6A7282" style={helpSupportStyles.contactValue}>
+                  {config.supportPhone} (24/7)
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-          {/* Email Support */}
-          <TouchableOpacity
-            style={helpSupportStyles.contactItem}
-            onPress={handleEmailSupport}
-            activeOpacity={0.7}
-          >
-            <View style={helpSupportStyles.contactIconContainer}>
-              <EmailIcon size={scale(17.5)} color="#32C96A" />
-            </View>
-            <View style={helpSupportStyles.contactInfo}>
-              <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>
-                Email Support
-              </Text>
-              <Text variant="bodySm" color="#6A7282" style={helpSupportStyles.contactValue}>
-                {config.supportEmail}
-              </Text>
-            </View>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={helpSupportStyles.contactItem}
+              onPress={handleEmailSupport}
+              activeOpacity={0.7}
+            >
+              <View style={helpSupportStyles.contactIconContainer}>
+                <EmailIcon size={scale(17.5)} color="#32C96A" />
+              </View>
+              <View style={helpSupportStyles.contactInfo}>
+                <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>
+                  Email Support
+                </Text>
+                <Text variant="bodySm" color="#6A7282" style={helpSupportStyles.contactValue}>
+                  {config.supportEmail}
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-          {/* Submit Ticket */}
-          <TouchableOpacity
-            style={helpSupportStyles.contactItem}
-            onPress={handleSubmitTicket}
-            activeOpacity={0.7}
-          >
-            <View style={helpSupportStyles.contactIconContainer}>
-              <ChatIcon size={scale(17.5)} color="#32C96A" />
-            </View>
-            <View style={helpSupportStyles.contactInfo}>
-              <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>
-                Submit Ticket
-              </Text>
-              <Text variant="bodySm" color="#6A7282" style={helpSupportStyles.contactValue}>
-                Create a support ticket – we'll respond in {config.supportSlaMessage}
-              </Text>
-            </View>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={helpSupportStyles.contactItem}
+              onPress={handleSubmitTicket}
+              activeOpacity={0.7}
+            >
+              <View style={helpSupportStyles.contactIconContainer}>
+                <ChatIcon size={scale(17.5)} color="#32C96A" />
+              </View>
+              <View style={helpSupportStyles.contactInfo}>
+                <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>
+                  Submit Ticket
+                </Text>
+                <Text variant="bodySm" color="#6A7282" style={helpSupportStyles.contactValue}>
+                  Create a support ticket – we'll respond in {config.supportSlaMessage}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Browse Help Topics Section */}
@@ -197,14 +262,11 @@ export default function HelpSupportScreen() {
                 </Text>
               </View>
             </View>
-            <View style={helpSupportStyles.topicCardRight}>
-              <View style={helpSupportStyles.articleCount}>
-                <Text variant="caption" style={helpSupportStyles.articleCountText}>
-                  3
-                </Text>
-              </View>
-              <ChevronRightIcon size={scale(17.5)} color="#6B7280" />
-            </View>
+            <ChevronRightIcon
+              size={scale(17.5)}
+              color="#6B7280"
+              style={helpSupportStyles.topicCardChevron}
+            />
           </TouchableOpacity>
 
           {/* Delivery Issues */}
@@ -226,14 +288,11 @@ export default function HelpSupportScreen() {
                 </Text>
               </View>
             </View>
-            <View style={helpSupportStyles.topicCardRight}>
-              <View style={helpSupportStyles.articleCount}>
-                <Text variant="caption" style={helpSupportStyles.articleCountText}>
-                  5
-                </Text>
-              </View>
-              <ChevronRightIcon size={scale(17.5)} color="#6B7280" />
-            </View>
+            <ChevronRightIcon
+              size={scale(17.5)}
+              color="#6B7280"
+              style={helpSupportStyles.topicCardChevron}
+            />
           </TouchableOpacity>
 
           {/* Account & Documents */}
@@ -255,14 +314,11 @@ export default function HelpSupportScreen() {
                 </Text>
               </View>
             </View>
-            <View style={helpSupportStyles.topicCardRight}>
-              <View style={helpSupportStyles.articleCount}>
-                <Text variant="caption" style={helpSupportStyles.articleCountText}>
-                  4
-                </Text>
-              </View>
-              <ChevronRightIcon size={scale(17.5)} color="#6B7280" />
-            </View>
+            <ChevronRightIcon
+              size={scale(17.5)}
+              color="#6B7280"
+              style={helpSupportStyles.topicCardChevron}
+            />
           </TouchableOpacity>
 
           {/* App Issues */}
@@ -284,14 +340,11 @@ export default function HelpSupportScreen() {
                 </Text>
               </View>
             </View>
-            <View style={helpSupportStyles.topicCardRight}>
-              <View style={helpSupportStyles.articleCount}>
-                <Text variant="caption" style={helpSupportStyles.articleCountText}>
-                  2
-                </Text>
-              </View>
-              <ChevronRightIcon size={scale(17.5)} color="#6B7280" />
-            </View>
+            <ChevronRightIcon
+              size={scale(17.5)}
+              color="#6B7280"
+              style={helpSupportStyles.topicCardChevron}
+            />
           </TouchableOpacity>
         </View>
       </ScrollView>

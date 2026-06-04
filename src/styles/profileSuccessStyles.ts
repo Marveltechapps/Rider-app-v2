@@ -1,6 +1,5 @@
 /**
  * Profile Update Success Screen Styles
- * Styles for profile update success confirmation
  */
 
 import { StyleSheet } from 'react-native';
@@ -11,15 +10,18 @@ const profileSuccessStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: scale(24),
-    gap: verticalScale(32),
+    paddingVertical: verticalScale(24),
+    gap: verticalScale(28),
   },
 
-  // Success Icon
   successIconContainer: {
     width: scale(120),
     height: scale(120),
@@ -34,31 +36,20 @@ const profileSuccessStyles = StyleSheet.create({
     elevation: 6,
   },
 
-  // Text Container
   textContainer: {
-    flexDirection: 'column',
+    width: '100%',
+    maxWidth: scale(320),
     alignItems: 'center',
-    gap: verticalScale(8),
-  },
-  title: {
-    fontSize: scale(28),
-    fontWeight: '700',
-    lineHeight: scale(36),
-    color: '#101828',
-    textAlign: 'center',
   },
   subtitle: {
-    fontSize: scale(14),
-    fontWeight: '400',
-    lineHeight: scale(21),
-    color: '#6A7282',
     textAlign: 'center',
-    maxWidth: scale(280),
+    width: '100%',
+    maxWidth: scale(300),
   },
 
-  // Summary Card
   summaryCard: {
-    flexDirection: 'column',
+    width: '100%',
+    maxWidth: scale(320),
     alignItems: 'center',
     gap: verticalScale(16),
     paddingVertical: verticalScale(24),
@@ -67,8 +58,6 @@ const profileSuccessStyles = StyleSheet.create({
     borderRadius: scale(12),
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    width: '100%',
-    maxWidth: scale(320),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -93,47 +82,35 @@ const profileSuccessStyles = StyleSheet.create({
     borderColor: '#32C96A',
   },
   initials: {
-    fontSize: scale(28),
-    fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
   },
   profileInfo: {
-    flexDirection: 'column',
+    width: '100%',
     alignItems: 'center',
     gap: verticalScale(4),
   },
   name: {
-    fontSize: scale(18),
-    fontWeight: '700',
-    lineHeight: scale(24),
-    color: '#101828',
     textAlign: 'center',
+    width: '100%',
   },
   email: {
-    fontSize: scale(13),
-    fontWeight: '400',
-    lineHeight: scale(18),
-    color: '#6A7282',
     textAlign: 'center',
+    width: '100%',
   },
   phone: {
-    fontSize: scale(13),
-    fontWeight: '400',
-    lineHeight: scale(18),
-    color: '#6A7282',
     textAlign: 'center',
+    width: '100%',
   },
 
-  // Buttons
   buttonContainer: {
-    flexDirection: 'column',
-    alignSelf: 'stretch',
-    gap: verticalScale(12),
     width: '100%',
     maxWidth: scale(320),
+    alignItems: 'center',
+    gap: verticalScale(12),
   },
   primaryButton: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -148,27 +125,20 @@ const profileSuccessStyles = StyleSheet.create({
     elevation: 4,
   },
   primaryButtonText: {
-    fontSize: scale(15.75),
-    fontWeight: '700',
-    lineHeight: scale(24),
     color: '#FFFFFF',
     textAlign: 'center',
   },
   secondaryButton: {
-    flexDirection: 'row',
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: verticalScale(12),
     paddingHorizontal: scale(24),
   },
   secondaryButtonText: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    lineHeight: scale(21),
     color: '#32C96A',
     textAlign: 'center',
   },
 });
 
 export default profileSuccessStyles;
-

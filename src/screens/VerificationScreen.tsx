@@ -26,6 +26,7 @@ import CheckmarkIcon from '../components/icons/CheckmarkIcon';
 import CheckmarkSmallIcon from '../components/icons/CheckmarkSmallIcon';
 import LoadingSpinnerIcon from '../components/icons/LoadingSpinnerIcon';
 import Header from '../components/layout/Header';
+import { getKycStatus, type KycStatusItem } from '../api/kyc';
 import { Theme } from '../constants/Theme';
 import { scale, verticalScale } from '../utils/responsive';
 
@@ -97,50 +98,42 @@ export default function VerificationScreen() {
   }, [spinValue]);
 
   useEffect(() => {
-    // Progressive verification flow
-    const verifyDocuments = async () => {
-      // Verify Aadhar Card after 1 second
-      setTimeout(() => {
-        setDocuments(prev => prev.map((doc, index) => 
-          index === 0 ? { ...doc, verified: true, verifying: false } : doc
-        ));
-        
-        // Start verifying PAN Card
-        setTimeout(() => {
-          setDocuments(prev => prev.map((doc, index) => 
-            index === 1 ? { ...doc, verifying: true } : doc
-          ));
-        }, 500);
-      }, 1000);
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-      // Verify PAN Card after 2.5 seconds
-      setTimeout(() => {
-        setDocuments(prev => prev.map((doc, index) => 
-          index === 1 ? { ...doc, verified: true, verifying: false } : doc
-        ));
-        
-        // Start verifying Driving License
-        setTimeout(() => {
-          setDocuments(prev => prev.map((doc, index) => 
-            index === 2 ? { ...doc, verifying: true } : doc
-          ));
-        }, 500);
-      }, 2500);
-
-      // Verify Driving License after 4 seconds
-      setTimeout(() => {
-        setDocuments(prev => prev.map((doc, index) => 
-          index === 2 ? { ...doc, verified: true, verifying: false } : doc
-        ));
-        
-        // Mark all as verified after final delay
-        setTimeout(() => {
+    const pollKyc = async () => {
+      try {
+        const res = await getKycStatus();
+        if (cancelled) return;
+        const docs = res.documents ?? [];
+        if (docs.length === 0) {
+          pollTimer = setTimeout(pollKyc, 3000);
+          return;
+        }
+        setDocuments(
+          docs.map((d: KycStatusItem) => ({
+            label: d.label,
+            verified: d.status === 'verified',
+            verifying: d.status === 'pending',
+          }))
+        );
+        const allDone = docs.every((d) => d.status === 'verified' || d.status === 'failed');
+        const anyPending = docs.some((d) => d.status === 'pending');
+        if (allDone || !anyPending) {
           setAllVerified(true);
-        }, 500);
-      }, 4000);
+        } else {
+          pollTimer = setTimeout(pollKyc, 3000);
+        }
+      } catch {
+        if (!cancelled) pollTimer = setTimeout(pollKyc, 5000);
+      }
     };
 
-    verifyDocuments();
+    pollKyc();
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
   }, []);
 
   const spin = spinValue.interpolate({

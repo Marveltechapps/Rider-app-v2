@@ -20,7 +20,7 @@ import WeeklyBarChart, { WeeklyBarData } from '../components/WeeklyBarChart';
 import { Theme } from '../constants/Theme';
 import earningsStyles from '../styles/earningsStyles';
 import { scale } from '../utils/responsive';
-import { getEarningsSummary, listPayouts } from '../api/payouts';
+import { getEarningsSummary, getEarningsSummaryForRange, listPayouts } from '../api/payouts';
 
 interface Incentive {
   id: string;
@@ -56,9 +56,13 @@ export default function EarningsWeekScreen() {
   const activeTab: EarningsTab = 'thisWeek';
   const [selectedWeek, setSelectedWeek] = useState<WeekRange | undefined>(undefined);
 
+  const weekRange = selectedWeek;
   const { data: summaryRes } = useQuery({
-    queryKey: ['earnings', 'summary', 'week'],
-    queryFn: () => getEarningsSummary('week'),
+    queryKey: ['earnings', 'summary', 'week', weekRange?.startDate?.toISOString(), weekRange?.endDate?.toISOString()],
+    queryFn: () =>
+      weekRange
+        ? getEarningsSummaryForRange(weekRange.startDate, weekRange.endDate)
+        : getEarningsSummary('week'),
     staleTime: 60 * 1000,
   });
   const { data: payoutsRes } = useQuery({
@@ -114,10 +118,6 @@ export default function EarningsWeekScreen() {
 
   const handleWeekSelect = useCallback((weekRange: WeekRange) => {
     setSelectedWeek(weekRange);
-    // TODO: Fetch actual data for the selected week from API
-    // For now, using mock data that changes based on selected week
-    // When API is connected, fetch data here using weekRange.startDate and weekRange.endDate
-    console.log('Selected week:', weekRange);
   }, []);
 
   // Format week range for display

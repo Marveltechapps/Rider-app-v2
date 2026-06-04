@@ -31,8 +31,8 @@ import SlotsStatIcon from '../components/icons/SlotsStatIcon';
 import { Theme } from '../constants/Theme';
 import { useConfigWithDefaults, useUser } from '../contexts';
 import { scale, verticalScale, wp } from '../utils/responsive';
-import { listOrders } from '../api/orders';
 import { setRiderAvailability } from '../api/rider';
+import { startShift, endShift } from '../api/shifts';
 import { AUTH_REQUIRED_MESSAGE } from '../api/client';
 import { getHome, type RiderHomePayload } from '../api/home';
 import { getMyShifts, type BackendRiderShift } from '../api/shifts';
@@ -144,6 +144,12 @@ export default function HomeScreen() {
   })();
 
   const isOnShift = !!currentShift || !!activeBookedShift;
+  const hasAssignedWork = Boolean(
+    homeData?.activeTask ||
+    (homeData?.queue?.length ?? 0) > 0 ||
+    (homeData?.todaySummary?.ordersAssigned ?? 0) > 0
+  );
+  const canViewOrders = isOnShift || hasAssignedWork;
 
   const ordersAssigned = homeData?.todaySummary?.ordersAssigned ?? 0;
   const ordersCompleted = homeData?.todaySummary?.ordersCompleted ?? 0;
@@ -156,7 +162,7 @@ export default function HomeScreen() {
   const lateCount = homeData?.todaySummary?.lateCount ?? 0;
 
   const isCashLimitExceeded = amountCollectedCod >= CASH_LIMIT;
-  const showAvailableOrders = isOnline && !isCashLimitExceeded;
+  const showAvailableOrders = (isOnline || canViewOrders) && !isCashLimitExceeded;
 
   const progress = ordersAssigned > 0 ? ordersCompleted / ordersAssigned : 0;
   const progressPercentage = Math.max(0, Math.min(100, progress * 100));
@@ -269,13 +275,6 @@ export default function HomeScreen() {
     if (!homeError || homeLoading) return;
     const message = homeError instanceof Error ? homeError.message : String(homeError);
     if (message !== AUTH_REQUIRED_MESSAGE) return;
-    
-    // Check if onboarding is complete. If NOT, we shouldn't even be here.
-    if (!userData.onboardingComplete) {
-      console.log('[HomeScreen] Auth error but onboarding not complete, redirecting to onboarding');
-      router.replace('/search-location');
-      return;
-    }
 
     const elapsed = Date.now() - mountedAtRef.current;
     // Allow retries for a longer period (10s instead of 5s)
@@ -293,32 +292,18 @@ export default function HomeScreen() {
     console.log('[HomeScreen] Auth retries exhausted, logging out');
     setRedirectingDueToAuth(true);
     logout();
-  }, [homeError, homeLoading, logout, refetchHome, userData.onboardingComplete]);
-
-  const {
-    data: ordersData,
-    isLoading: ordersLoading,
-    error: ordersError,
-    refetch: fetchOrders,
-  } = useQuery({
-    queryKey: ['orders', 'list', userData.riderId],
-    queryFn: () => listOrders({ limit: config.orderListLimit }),
-    // If rider is not on shift, do not fetch/show orders.
-    enabled: !!userData.riderId && isOnShift,
-    staleTime: 15 * 1000,
-    refetchOnWindowFocus: true, // Refetch when app comes to foreground (WebSocket is primary for real-time)
-  });
-  const ordersFromApi = ordersData?.orders ?? [];
+  }, [homeError, homeLoading, logout, refetchHome]);
 
   // WebSocket connection is managed at app level (tab layout). Here we only trigger refetch on push.
   useEffect(() => {
-    const handler = () => {
+    const handler = async () => {
+      await queryClient.invalidateQueries({ queryKey: ['rider-home'] });
+      await queryClient.refetchQueries({ queryKey: ['rider-home'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      fetchOrders();
     };
     riderWebSocketService.on('orders:refresh', handler);
     return () => riderWebSocketService.off('orders:refresh', handler);
-  }, [queryClient, fetchOrders]);
+  }, [queryClient]);
 
   const handleAvailabilityChange = useCallback(
     async (value: boolean) => {
@@ -331,9 +316,23 @@ export default function HomeScreen() {
       setIsOnline(value);
       setAvailabilityLoading(true);
       try {
+        if (value && activeBookedShift?.id && !currentShift) {
+          try {
+            await startShift(activeBookedShift.id);
+          } catch {
+            // Shift may already be started
+          }
+        }
+        if (!value && activeBookedShift?.id) {
+          try {
+            await endShift(activeBookedShift.id);
+          } catch {
+            // Best-effort end
+          }
+        }
         await setRiderAvailability(riderId, availability);
-        // Ensure home data is refreshed immediately to reflect the DB state
         queryClient.invalidateQueries({ queryKey: ['rider-home'] });
+        queryClient.invalidateQueries({ queryKey: ['my-shifts-today'] });
         refetchHome();
       } catch (e) {
         setIsOnline(!value);
@@ -343,7 +342,7 @@ export default function HomeScreen() {
         setAvailabilityLoading(false);
       }
     },
-    [userData.riderId]
+    [userData.riderId, activeBookedShift, currentShift, queryClient, refetchHome]
   );
 
   if (redirectingDueToAuth) {
@@ -572,40 +571,7 @@ export default function HomeScreen() {
           </LinearGradient>
         </View>
 
-        {/* Orders CTA - buttons only, no order cards on home */}
-        {showAvailableOrders ? (
-          <View style={{ padding: scale(20) }}>
-            {ordersLoading ? (
-              <View style={{ alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={Theme.colors.primaryMedium} />
-                <Text variant="caption" color={Theme.colors.textGrey} style={{ marginTop: 8 }}>Loading…</Text>
-              </View>
-            ) : ordersError ? (
-              <Text variant="bodySm" color={Theme.colors.textGrey}>{ordersError instanceof Error ? ordersError.message : String(ordersError)}</Text>
-            ) : (
-              <TouchableOpacity
-                style={{
-                  backgroundColor: Theme.colors.primaryMedium,
-                  paddingVertical: scale(12),
-                  paddingHorizontal: scale(16),
-                  borderRadius: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: scale(8),
-                  width: '100%',
-                }}
-                onPress={() => router.push('/(tabs)/orders')}
-                activeOpacity={0.8}
-              >
-                <Text variant="bodySm" color="#FFFFFF" style={{ fontWeight: '600' }}>
-                  View live orders
-                </Text>
-                <ArrowRightIcon size={scale(18)} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
+        {!showAvailableOrders && (
           <View style={styles.ordersBlockedCard}>
             {!isOnline && !isOnShift ? (
               <>

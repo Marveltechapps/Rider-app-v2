@@ -1,145 +1,103 @@
 /**
- * Document Status Detail Screen Component
- * Shows documents grouped by status with segmented control
- * Matches Figma design exactly
+ * Document Status Detail — filter documents by status from KYC API
  */
 
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentCard from '../components/DocumentCard';
 import Text from '../components/common/Text';
+import AppPressable from '../components/common/AppPressable';
 import BackArrowIcon from '../components/icons/BackArrowIcon';
-import FileIcon from '../components/icons/FileIcon';
+import { runBackNavigation } from '../utils/safeNavigation';
 import documentsStyles from '../styles/documentsStyles';
-import { DOCUMENTS, DocumentStatus, getDocumentsByStatus } from '../types/documents';
+import { DocumentStatus } from '../types/documents';
 import { scale } from '../utils/responsive';
+import { getDocumentTypes, getKycStatus } from '../api/kyc';
+import {
+  buildKycDocumentList,
+  kycItemToRiderDocument,
+  KYC_QUERY_KEY,
+} from '../utils/kycDocumentStatus';
 
 export default function DocumentStatusDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+
   const initialStatus = (params.status as DocumentStatus) || 'verified';
   const [activeStatus, setActiveStatus] = useState<DocumentStatus>(initialStatus);
 
-  // Filter documents by active status
+  const { data: kycRes, isLoading, refetch } = useQuery({
+    queryKey: KYC_QUERY_KEY,
+    queryFn: getKycStatus,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  const { data: typesRes } = useQuery({
+    queryKey: ['kyc', 'document-types'],
+    queryFn: getDocumentTypes,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch])
+  );
+
+  const allDocuments = useMemo(() => {
+    const items = buildKycDocumentList(kycRes?.documents, typesRes?.documentTypes);
+    return items.map(kycItemToRiderDocument);
+  }, [kycRes?.documents, typesRes?.documentTypes]);
+
   const filteredDocuments = useMemo(
-    () => getDocumentsByStatus(DOCUMENTS, activeStatus),
-    [activeStatus]
+    () => allDocuments.filter((d) => d.status === activeStatus),
+    [allDocuments, activeStatus]
   );
 
   const handleBack = useCallback(() => {
-    router.back();
+    runBackNavigation(router);
   }, [router]);
 
-  const handleDocumentPress = useCallback((documentId: string) => {
-    console.log('Document detail:', documentId);
-    // TODO: Navigate to document detail/upload screen
-  }, []);
+  const statusTabs: DocumentStatus[] = ['verified', 'under_review', 'pending', 'rejected'];
 
-  const handleSegmentPress = useCallback((status: DocumentStatus) => {
-    setActiveStatus(status);
-  }, []);
-
-  // Get info text based on status
-  const getInfoText = () => {
-    switch (activeStatus) {
-      case 'verified':
-        return {
-          title: 'Verified Documents',
-          description: 'These documents have been checked and approved. You can start taking orders with verified documents.',
-        };
-      case 'pending':
-        return {
-          title: 'Pending Documents',
-          description: 'These documents are submitted and waiting for review. Verification usually takes 24-48 hours.',
-        };
-      case 'expired':
-        return {
-          title: 'Expired Documents',
-          description: 'These documents have expired. Please upload new documents to continue taking orders.',
-        };
-    }
+  const tabLabel = (s: DocumentStatus) => {
+    if (s === 'under_review') return 'Under Review';
+    return s.charAt(0).toUpperCase() + s.slice(1);
   };
-
-  const infoContent = getInfoText();
 
   return (
     <SafeAreaView style={documentsStyles.container} edges={['top', 'bottom']}>
-      {/* Header */}
       <View style={documentsStyles.header}>
-        <TouchableOpacity
-          style={documentsStyles.backButton}
-          onPress={handleBack}
-          activeOpacity={0.7}
-        >
-          <BackArrowIcon size={scale(17.5)} color="#101828" />
-        </TouchableOpacity>
-        <Text variant="h2" color="#101828" style={documentsStyles.headerTitle}>
-          Document Details
+        <AppPressable style={documentsStyles.backButton} onPress={handleBack} accessibilityLabel="Go back">
+          <BackArrowIcon size={scale(16)} color="#101828" />
+        </AppPressable>
+        <Text variant="h3" style={documentsStyles.headerTitle}>
+          Documents
         </Text>
-        <View style={{ width: scale(42) }} />
       </View>
 
-      {/* Segmented Control */}
-      <View style={documentsStyles.segmentedControl}>
-        <TouchableOpacity
-          style={[
-            documentsStyles.segment,
-            activeStatus === 'verified' ? documentsStyles.segmentActive : documentsStyles.segmentInactive,
-          ]}
-          onPress={() => handleSegmentPress('verified')}
-          activeOpacity={0.7}
-        >
-          <Text
-            variant="bodySm"
+      <View style={documentsStyles.tabsContainer}>
+        {statusTabs.map((status) => (
+          <AppPressable
+            key={status}
             style={[
-              documentsStyles.segmentText,
-              activeStatus === 'verified' ? documentsStyles.segmentTextActive : documentsStyles.segmentTextInactive,
+              documentsStyles.tab,
+              activeStatus === status && documentsStyles.tabActive,
             ]}
+            onPress={() => setActiveStatus(status)}
           >
-            Verified
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            documentsStyles.segment,
-            activeStatus === 'pending' ? documentsStyles.segmentActive : documentsStyles.segmentInactive,
-          ]}
-          onPress={() => handleSegmentPress('pending')}
-          activeOpacity={0.7}
-        >
-          <Text
-            variant="bodySm"
-            style={[
-              documentsStyles.segmentText,
-              activeStatus === 'pending' ? documentsStyles.segmentTextActive : documentsStyles.segmentTextInactive,
-            ]}
-          >
-            Pending
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            documentsStyles.segment,
-            activeStatus === 'expired' ? documentsStyles.segmentActive : documentsStyles.segmentInactive,
-          ]}
-          onPress={() => handleSegmentPress('expired')}
-          activeOpacity={0.7}
-        >
-          <Text
-            variant="bodySm"
-            style={[
-              documentsStyles.segmentText,
-              activeStatus === 'expired' ? documentsStyles.segmentTextActive : documentsStyles.segmentTextInactive,
-            ]}
-          >
-            Expired
-          </Text>
-        </TouchableOpacity>
+            <Text
+              variant="bodySm"
+              style={activeStatus === status ? documentsStyles.tabTextActive : documentsStyles.tabText}
+            >
+              {tabLabel(status)}
+            </Text>
+          </AppPressable>
+        ))}
       </View>
 
       <ScrollView
@@ -147,40 +105,18 @@ export default function DocumentStatusDetailScreen() {
         contentContainerStyle={documentsStyles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Info Section */}
-        <View style={documentsStyles.infoSection}>
-          <Text variant="body" style={documentsStyles.infoTitle}>
-            {infoContent.title}
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#155DFC" style={{ marginTop: scale(24) }} />
+        ) : filteredDocuments.length === 0 ? (
+          <Text variant="body" color="#6B7280" style={{ textAlign: 'center', marginTop: scale(24) }}>
+            No {tabLabel(activeStatus).toLowerCase()} documents
           </Text>
-          <Text variant="bodySm" style={documentsStyles.infoText}>
-            {infoContent.description}
-          </Text>
-        </View>
-
-        {/* Documents List */}
-        <View style={documentsStyles.documentsSection}>
-          {filteredDocuments.length > 0 ? (
-            filteredDocuments.map((doc) => (
-              <DocumentCard
-                key={doc.id}
-                document={doc}
-                onPress={() => handleDocumentPress(doc.id)}
-                showStatus={false}
-              />
-            ))
-          ) : (
-            <View style={documentsStyles.emptyState}>
-              <FileIcon size={scale(48)} color="#D1D5DB" />
-              <Text variant="body" style={documentsStyles.emptyStateText}>
-                No {activeStatus} documents
-              </Text>
-            </View>
-          )}
-        </View>
+        ) : (
+          filteredDocuments.map((doc) => (
+            <DocumentCard key={doc.id} document={doc} onPress={() => router.push('/my-documents' as any)} />
+          ))
+        )}
       </ScrollView>
-
-      {/* Bottom Tab Bar */}
     </SafeAreaView>
   );
 }
-

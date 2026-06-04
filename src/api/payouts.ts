@@ -23,7 +23,7 @@ export interface PayoutStatementResponse {
   statement: unknown;
 }
 
-export type EarningsPeriod = 'today' | 'week' | 'month';
+export type EarningsPeriod = 'today' | 'week' | 'month' | 'lifetime';
 
 export interface EarningsSummaryResponse {
   totalEarnings: number;
@@ -31,11 +31,34 @@ export interface EarningsSummaryResponse {
   periodStart: string;
   periodEnd: string;
   dailyBreakdown?: { dayLabel: string; value: number; orderCount: number }[];
+  onlineTime?: string;
+  withdrawalsToday?: number;
+  activeIncentives?: Array<{
+    id: string;
+    title: string;
+    subtitle: string;
+    reward: string;
+    completed: number;
+    target: number;
+    status: 'active' | 'unlocked';
+  }>;
 }
 
-/** Get earnings summary for the authenticated rider (today / week / month). */
+/** Get earnings summary for the authenticated rider (today / week / month / lifetime). */
 export async function getEarningsSummary(period: EarningsPeriod): Promise<EarningsSummaryResponse> {
   return api.get<EarningsSummaryResponse>(`/api/v1/payouts/summary?period=${period}`);
+}
+
+/** Get earnings summary for a custom date range (week calendar picker). */
+export async function getEarningsSummaryForRange(
+  startDate: Date,
+  endDate: Date
+): Promise<EarningsSummaryResponse> {
+  const start = startDate.toISOString();
+  const end = endDate.toISOString();
+  return api.get<EarningsSummaryResponse>(
+    `/api/v1/payouts/summary?startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}`
+  );
 }
 
 /** List payouts for the authenticated rider */
@@ -44,8 +67,9 @@ export async function listPayouts(limit = 20): Promise<PayoutsListResponse> {
 }
 
 /** Get payout statement */
-export async function getStatement(): Promise<PayoutStatementResponse> {
-  return api.get<PayoutStatementResponse>('/api/v1/payouts/statement');
+export async function getStatement(startDate: Date, endDate: Date): Promise<PayoutStatementResponse> {
+  const qs = `startDate=${encodeURIComponent(startDate.toISOString())}&endDate=${encodeURIComponent(endDate.toISOString())}`;
+  return api.get<PayoutStatementResponse>(`/api/v1/payouts/statement?${qs}`);
 }
 
 /** Request a payout */

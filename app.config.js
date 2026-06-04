@@ -60,6 +60,12 @@ module.exports = {
             'QuickRider uses your location to detect your city and show you on the map during onboarding.',
         },
       ],
+      [
+        'expo-camera',
+        {
+          cameraPermission: 'Allow camera access to scan delivery bag barcodes at the darkstore.',
+        },
+      ],
       withGoogleMapsApiKey,
       withIosUIViewControllerBasedStatusBar,
     ],

@@ -4,6 +4,7 @@
 
 import { API_BASE_URL_ENV_KEY, getBaseUrlOrThrow } from './config';
 import { asRecord, getApiErrorMessage, unwrapApiPayload } from './parseResponse';
+import { toTenDigitMobile } from '../utils/phoneNumber';
 
 /** Normalize phone for display: digits only, optional leading + */
 export const normalizePhoneNumber = (phone: string): string => {
@@ -11,14 +12,8 @@ export const normalizePhoneNumber = (phone: string): string => {
   return digits.startsWith('91') && digits.length === 12 ? `+${digits}` : digits.length === 10 ? `+91${digits}` : `+${digits}`;
 };
 
-/** Get 10-digit mobile for signin API (same as Postman: real-time SMS) */
-function toSigninMobile(phoneNumber: string): string {
-  const digits = phoneNumber.replace(/\D/g, '');
-  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
-  if (digits.length === 10) return digits;
-  if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
-  return digits.slice(-10);
-}
+/** @deprecated alias — use toTenDigitMobile */
+const toSigninMobile = toTenDigitMobile;
 
 export interface RequestOtpResponse {
   success?: boolean;
@@ -82,6 +77,42 @@ export async function existingUserLogin(phoneNumber: string): Promise<ExistingUs
   } catch {
     clearTimeout(timeoutId);
     return { canSkipOtp: false };
+  }
+}
+
+/** Resend OTP – uses dedicated /api/signin/resend-otp endpoint */
+export async function resendOtp(phoneNumber: string): Promise<RequestOtpResponse> {
+  const base = getBaseUrlOrThrow();
+  const mobile = toSigninMobile(phoneNumber);
+  if (mobile.length !== 10) {
+    throw new Error('Phone number must be 10 digits (or 12 with 91).');
+  }
+  const url = `${base}/api/signin/resend-otp`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mobileNumber: mobile }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const raw = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(getApiErrorMessage(asRecord(raw), res.status));
+    }
+    const data = unwrapApiPayload<{ message?: string }>(raw);
+    return { success: true, message: data.message ?? 'OTP resent successfully' };
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error) {
+      if (err.name === 'AbortError' || err.message.includes('Network request failed') || err.message.includes('Failed to fetch')) {
+        throw new Error('Unable to resend OTP right now. Please try again in a moment.');
+      }
+      throw err;
+    }
+    throw err as any;
   }
 }
 

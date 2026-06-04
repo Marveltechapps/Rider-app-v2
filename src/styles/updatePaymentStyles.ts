@@ -61,7 +61,7 @@ const updatePaymentStyles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: scale(21),
     gap: verticalScale(20),
-    // Extra bottom space so the CTA stays reachable with keyboard open.
+    alignItems: 'stretch',
     paddingBottom: verticalScale(96),
   },
 
@@ -75,7 +75,8 @@ const updatePaymentStyles = StyleSheet.create({
   formPanel: {
     flexDirection: 'column',
     gap: verticalScale(14),
-    width: scale(360),
+    alignSelf: 'stretch',
+    width: '100%',
   },
   formContent: {
     flexDirection: 'column',
@@ -83,40 +84,30 @@ const updatePaymentStyles = StyleSheet.create({
     gap: verticalScale(16),
   },
 
-  // Find IFSC Button (inline)
-  findIfscButton: {
-    paddingHorizontal: scale(7),
-    paddingVertical: verticalScale(1.75),
-    height: scale(14),
+  ifscHelpLink: {
+    alignSelf: 'flex-start',
+    marginTop: verticalScale(-8),
+  },
+  ifscHelpLinkText: {
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  verifyUpiButton: {
+    alignSelf: 'stretch',
+    minHeight: scale(40),
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: scale(8),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: scale(10.5),
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(10),
   },
-  findIfscText: {
-    fontSize: scale(12),
+  verifyUpiButtonText: {
     fontWeight: '700',
-    lineHeight: scale(14),
     color: '#32C96A',
     textAlign: 'center',
-  },
-
-  // Verify Button (inline)
-  verifyButton: {
-    paddingHorizontal: scale(7),
-    paddingVertical: verticalScale(18),
-    height: scale(17.5),
-    backgroundColor: '#F0FDF4',
-    borderRadius: scale(3.5),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: scale(10.5),
-  },
-  verifyButtonText: {
-    fontSize: scale(12),
-    fontWeight: '700',
-    lineHeight: scale(14),
-    color: '#32C96A',
-    textAlign: 'left',
   },
 
   // Verification Note

@@ -15,6 +15,7 @@ const paymentSuccessStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    alignSelf: 'stretch',
     paddingHorizontal: scale(24),
     gap: verticalScale(32),
   },
@@ -123,7 +124,8 @@ const paymentSuccessStyles = StyleSheet.create({
     alignSelf: 'stretch',
     gap: verticalScale(12),
     width: '100%',
-    maxWidth: scale(320),
+    maxWidth: scale(360),
+    paddingHorizontal: scale(21),
   },
   primaryButton: {
     flexDirection: 'row',

@@ -27,12 +27,14 @@ import Header from '../components/layout/Header';
 import { useUser } from '../contexts';
 import { Theme } from '../constants/Theme';
 import { scale, verticalScale } from '../utils/responsive';
-import { uploadKycDocument } from '../api/kyc';
+import { invalidateKycStatusCache, uploadKycDocument } from '../api/kyc';
+import { useQueryClient } from '@tanstack/react-query';
 import { goBackOrReplace, resolveUploadBackFallback } from '../utils/navigation/safeBack';
 
 export default function PANUploadScreen() {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const queryClient = useQueryClient();
   const { userData, updateUserData } = useUser();
   const [panNumber, setPanNumber] = useState(userData.panNumber || '');
   const [documentUri, setDocumentUri] = useState<string | null>(userData.panUri);
@@ -101,8 +103,13 @@ export default function PANUploadScreen() {
       setError('');
       try {
         const result = await uploadKycDocument(documentUri, 'pan', 'pan.jpg', 'image/jpeg', panNumber);
+        await invalidateKycStatusCache(queryClient);
         const uploadedLink = (result && (result.uploadedLink || (result as any).uploadedLink)) ?? undefined;
-        router.replace({ pathname: '/kyc-upload', params: { updatedDoc: 'pan', uploadedLink } });
+        if (returnTo === '/my-documents') {
+          router.replace('/my-documents' as any);
+        } else {
+          router.replace({ pathname: '/kyc-upload', params: { updatedDoc: 'pan', uploadedLink } });
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Upload failed. Please try again.');
       } finally {

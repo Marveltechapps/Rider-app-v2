@@ -2,8 +2,8 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { ActivityIndicator, InteractionManager, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
@@ -14,16 +14,18 @@ import { Theme } from '../src/constants/Theme';
 import { PaymentProvider } from '../src/contexts/PaymentContext';
 import { ConfigProvider, UserProvider, useUser } from '../src/contexts';
 import { useFonts } from '../src/hooks/useFonts';
+import { logStartupNav } from '../src/utils/startupNavigation';
 
 export const unstable_settings = {
-  initialRouteName: 'splash',
+  initialRouteName: 'index',
 };
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 15 * 1000, // 15s for rider data (Home, History, Profile, Earnings)
-      gcTime: 5 * 60 * 1000, // 5 min cache keep
+      staleTime: 15 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
     },
   },
 });
@@ -52,68 +54,88 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { authLoaded, isLoggedIn, userData } = useUser();
   const segments = useSegments();
   const router = useRouter();
-  const [isReady, setIsReady] = useState(false);
+  const redirectTaskRef = useRef<ReturnType<typeof InteractionManager.runAfterInteractions> | null>(null);
 
   useEffect(() => {
-    // Brief delay so segment/router state is stable after navigation
-    const t = setTimeout(() => setIsReady(true), 50);
-    return () => clearTimeout(t);
-  }, []);
+    if (!authLoaded) return;
 
-  useEffect(() => {
-    if (!authLoaded || !isReady) return;
-    // ... rest of initialization logic
-
-    const currentSegment = segments[0] || '';
-    const isPublicRoute = PUBLIC_ROUTES.includes(currentSegment);
-    const isOnboardingRoute = ONBOARDING_ROUTES.includes(currentSegment);
-
-    // Persist current onboarding step
-    if (isLoggedIn && isOnboardingRoute) {
-      import('../src/api/storage').then(({ setStoredOnboardingStep }) => {
-        setStoredOnboardingStep('/' + currentSegment);
-      });
+    if (redirectTaskRef.current) {
+      redirectTaskRef.current.cancel();
     }
 
-    // Clear onboarding step when complete
-    if (isLoggedIn && userData.onboardingComplete) {
-      import('../src/api/storage').then(({ clearStoredOnboardingStep }) => {
-        clearStoredOnboardingStep();
-      });
-    }
+    redirectTaskRef.current = InteractionManager.runAfterInteractions(() => {
+      const currentSegment = segments[0] || '';
+      const isPublicRoute = PUBLIC_ROUTES.includes(currentSegment);
+      const isOnboardingRoute = ONBOARDING_ROUTES.includes(currentSegment);
 
-    if (!isLoggedIn) {
-      if (!isPublicRoute) {
-        console.log('[AuthGuard] Not logged in, redirecting to login');
-        router.replace('/login');
+      if (isLoggedIn && !userData.onboardingComplete && isOnboardingRoute) {
+        import('../src/api/storage').then(({ setStoredOnboardingStep }) => {
+          setStoredOnboardingStep('/' + currentSegment);
+        });
       }
-    } else {
-      // IS LOGGED IN
-      if (isPublicRoute) {
-        // If logged in and on a public screen, redirect based on onboarding status
-        if (userData.onboardingComplete) {
-          if (currentSegment === '(tabs)') return;
-          console.log('[AuthGuard] User complete, redirecting to dashboard');
+
+      if (isLoggedIn && userData.onboardingComplete) {
+        import('../src/api/storage').then(({ clearStoredOnboardingStep }) => {
+          clearStoredOnboardingStep();
+        });
+      }
+
+      if (!isLoggedIn) {
+        if (!isPublicRoute && currentSegment !== 'index') {
+          logStartupNav('AuthGuard redirect', {
+            from: currentSegment,
+            to: '/login',
+            reason: 'not_logged_in',
+          });
+          router.replace('/login');
+        }
+        return;
+      }
+
+      if (userData.onboardingComplete) {
+        if (isOnboardingRoute) {
+          logStartupNav('AuthGuard redirect', {
+            from: currentSegment,
+            to: '/(tabs)',
+            reason: 'onboarding_already_complete_blocked_onboarding_route',
+          });
           router.replace('/(tabs)');
-        } else if (userData.onboardingStep) {
-          // Map backend step to frontend route
+          return;
+        }
+        if (isPublicRoute && currentSegment !== 'index' && currentSegment !== '(tabs)' && currentSegment !== 'splash') {
+          logStartupNav('AuthGuard redirect', {
+            from: currentSegment,
+            to: '/(tabs)',
+            reason: 'logged_in_complete_on_public_route',
+          });
+          router.replace('/(tabs)');
+        }
+        return;
+      }
+
+      if (isPublicRoute) {
+        if (userData.onboardingStep) {
           const stepMap: Record<string, string> = {
-            'profile': '/personal-details',
-            'location': '/search-location',
-            'vehicle': '/vehicle-details',
+            profile: '/personal-details',
+            location: '/search-location',
+            vehicle: '/vehicle-details',
             'profile-photo': '/profile-photo',
-            'documents': '/kyc-upload',
-            'training': '/training-kit',
-            'kit': '/training-kit',
-            'complete': '/(tabs)'
+            documents: '/kyc-upload',
+            training: '/training-kit',
+            kit: '/training-kit',
+            complete: '/(tabs)',
           };
           const targetRoute = stepMap[userData.onboardingStep];
           if (targetRoute && '/' + currentSegment !== targetRoute) {
-            console.log('[AuthGuard] Redirecting to backend-defined onboarding step:', userData.onboardingStep);
+            logStartupNav('AuthGuard redirect', {
+              from: currentSegment,
+              to: targetRoute,
+              reason: 'onboarding_incomplete_resume_step',
+              onboardingStep: userData.onboardingStep,
+            });
             router.replace(targetRoute as any);
           }
         } else {
-          // If onboarding is NOT complete and no step defined, we should go to the onboarding flow.
           (async () => {
             try {
               const { getStoredOnboardingStep } = await import('../src/api/storage');
@@ -121,35 +143,52 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
               const stepSegment = step?.replace(/^\//, '');
               if (step && !PUBLIC_ROUTES.includes(stepSegment || '')) {
                 if ('/' + currentSegment === step) return;
-                console.log('[AuthGuard] Resuming onboarding from stored step (fallback):', step);
+                logStartupNav('AuthGuard redirect', {
+                  from: currentSegment,
+                  to: step,
+                  reason: 'onboarding_incomplete_stored_step',
+                });
                 router.replace(step as any);
               } else {
                 if (currentSegment === 'search-location') return;
-                console.log('[AuthGuard] No stored step, starting onboarding from /search-location');
+                logStartupNav('AuthGuard redirect', {
+                  from: currentSegment,
+                  to: '/search-location',
+                  reason: 'onboarding_incomplete_no_stored_step',
+                });
                 router.replace('/search-location');
               }
             } catch {
               if (currentSegment === 'search-location') return;
+              logStartupNav('AuthGuard redirect', {
+                from: currentSegment,
+                to: '/search-location',
+                reason: 'onboarding_incomplete_stored_step_error',
+              });
               router.replace('/search-location');
             }
           })();
         }
-      } else if (!userData.onboardingComplete && !isOnboardingRoute && currentSegment !== '(tabs)') {
-        // If logged in but onboarding not complete, and not on an onboarding route or tabs, redirect to onboarding
+      } else if (!isOnboardingRoute && currentSegment !== '(tabs)') {
         if (userData.onboardingStep) {
           const stepMap: Record<string, string> = {
-            'profile': '/personal-details',
-            'location': '/search-location',
-            'vehicle': '/vehicle-details',
+            profile: '/personal-details',
+            location: '/search-location',
+            vehicle: '/vehicle-details',
             'profile-photo': '/profile-photo',
-            'documents': '/kyc-upload',
-            'training': '/training-kit',
-            'kit': '/training-kit',
-            'complete': '/(tabs)'
+            documents: '/kyc-upload',
+            training: '/training-kit',
+            kit: '/training-kit',
+            complete: '/(tabs)',
           };
           const targetRoute = stepMap[userData.onboardingStep];
           if (targetRoute) {
-            console.log('[AuthGuard] Redirecting to backend-defined step:', targetRoute);
+            logStartupNav('AuthGuard redirect', {
+              from: currentSegment,
+              to: targetRoute,
+              reason: 'onboarding_incomplete_wrong_route',
+              onboardingStep: userData.onboardingStep,
+            });
             router.replace(targetRoute as any);
             return;
           }
@@ -160,21 +199,38 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
             const step = await getStoredOnboardingStep();
             const stepSegment = step?.replace(/^\//, '');
             if (step && !PUBLIC_ROUTES.includes(stepSegment || '')) {
-              console.log('[AuthGuard] Redirecting to onboarding step (fallback):', step);
+              logStartupNav('AuthGuard redirect', {
+                from: currentSegment,
+                to: step,
+                reason: 'onboarding_incomplete_fallback_stored_step',
+              });
               router.replace(step as any);
             } else {
-              console.log('[AuthGuard] Redirecting to onboarding start');
+              logStartupNav('AuthGuard redirect', {
+                from: currentSegment,
+                to: '/search-location',
+                reason: 'onboarding_incomplete_fallback_start',
+              });
               router.replace('/search-location');
             }
           } catch {
+            logStartupNav('AuthGuard redirect', {
+              from: currentSegment,
+              to: '/search-location',
+              reason: 'onboarding_incomplete_fallback_error',
+            });
             router.replace('/search-location');
           }
         })();
       }
-    }
-  }, [isLoggedIn, authLoaded, segments, userData.onboardingComplete, userData.onboardingStep, isReady]);
+    });
 
-  if (!authLoaded || !isReady) {
+    return () => {
+      redirectTaskRef.current?.cancel();
+    };
+  }, [isLoggedIn, authLoaded, segments, userData.onboardingComplete, userData.onboardingStep, router]);
+
+  if (!authLoaded) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Theme.colors.primary} />
@@ -191,7 +247,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (isLoggedIn) {
     // If complete, don't show public routes (except splash which has its own timer)
-    if (userData.onboardingComplete && isPublicRoute && currentSegment !== 'splash') {
+    if (userData.onboardingComplete && isPublicRoute && currentSegment !== 'splash' && currentSegment !== 'index') {
       shouldShowLoadingOverlay = true;
     }
     // If incomplete, don't show tabs or other main app routes
@@ -209,7 +265,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return (
       <View style={{ flex: 1 }}>
         {children}
-        <View style={[StyleSheet.absoluteFill, styles.loadingContainer, { backgroundColor: Theme.colors.background }]}>
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, styles.loadingContainer, { backgroundColor: Theme.colors.background }]}
+        >
           <ActivityIndicator size="large" color={Theme.colors.primary} />
         </View>
       </View>
@@ -327,8 +386,19 @@ export default function RootLayout() {
                             animation: 'none',
                           }} 
                         />
+                        <Stack.Screen name="travel-to-darkstore" options={{ headerShown: false }} />
+                        <Stack.Screen name="collect-bag" options={{ headerShown: false }} />
+                        <Stack.Screen name="customer-navigation" options={{ headerShown: false }} />
+                        <Stack.Screen name="customer-otp-verification" options={{ headerShown: false }} />
+                        <Stack.Screen name="delivery-photo" options={{ headerShown: false }} />
                         <Stack.Screen 
                           name="order-details" 
+                          options={{ 
+                            headerShown: false,
+                          }} 
+                        />
+                        <Stack.Screen 
+                          name="live-order-map" 
                           options={{ 
                             headerShown: false,
                           }} 
@@ -351,7 +421,9 @@ export default function RootLayout() {
                             headerShown: false,
                           }} 
                         />
+                        <Stack.Screen name="delivery-complete" options={{ headerShown: false }} />
                         <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
+                        <Stack.Screen name="profile-update-success" options={{ headerShown: false, title: 'Profile Update Success' }} />
                         <Stack.Screen name="my-documents" options={{ headerShown: false }} />
                         <Stack.Screen name="payment-details" options={{ headerShown: false }} />
                         <Stack.Screen name="update-payment-details" options={{ headerShown: false }} />

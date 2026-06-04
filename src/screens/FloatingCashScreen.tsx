@@ -1,11 +1,12 @@
 /**
- * Floating Cash Screen Component
- * Cash deposits and transaction history screen matching Figma design exactly
+ * Floating Cash Screen – COD collected vs deposited (backend synced)
  */
 
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -20,69 +21,33 @@ import { Theme } from '../constants/Theme';
 import { useConfigWithDefaults } from '../contexts';
 import { scale, verticalScale } from '../utils/responsive';
 import Text from '../components/common/Text';
-
-// Mock transaction data - After deposit: Total collected: 2450, Total deposited: 2000, Cash to deposit: 450 (under 2000 limit)
-// This shows the green progress bar state after deposit is completed
-const mockTransactions: CashTransaction[] = [
-  {
-    id: '1',
-    type: 'collected',
-    title: 'Cash Collected',
-    amount: 850,
-    dateTime: 'Today, 2:30 PM',
-    orderId: '#ORD-2991',
-  },
-  {
-    id: '2',
-    type: 'collected',
-    title: 'Cash Collected',
-    amount: 800,
-    dateTime: 'Today, 1:15 PM',
-    orderId: '#ORD-2990',
-  },
-  {
-    id: '3',
-    type: 'collected',
-    title: 'Cash Collected',
-    amount: 800,
-    dateTime: 'Today, 12:00 PM',
-    orderId: '#ORD-2989',
-  },
-  {
-    id: '4',
-    type: 'deposited',
-    title: 'Cash Deposited',
-    amount: 2000,
-    dateTime: 'Today, 11:00 AM',
-    status: 'SUCCESS',
-  },
-];
+import { getCashSummary, getCashTransactions } from '../api/cash';
 
 export default function FloatingCashScreen() {
   const router = useRouter();
   const config = useConfigWithDefaults();
   const [activeTab, setActiveTab] = useState<'all' | 'collected' | 'deposited'>('all');
 
-  // Calculate cash to be deposited (sum of collected - sum of deposited)
-  const cashToDeposit = useMemo(() => {
-    const collected = mockTransactions
-      .filter((t) => t.type === 'collected')
-      .reduce((sum, t) => sum + t.amount, 0);
-    const deposited = mockTransactions
-      .filter((t) => t.type === 'deposited')
-      .reduce((sum, t) => sum + t.amount, 0);
-    return collected - deposited;
-  }, []);
+  const { data: summary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['cash', 'summary'],
+    queryFn: getCashSummary,
+    staleTime: 30 * 1000,
+  });
 
+  const { data: txRes, isLoading: txLoading } = useQuery({
+    queryKey: ['cash', 'transactions'],
+    queryFn: () => getCashTransactions(50),
+    staleTime: 30 * 1000,
+  });
+
+  const cashToDeposit = summary?.cashToDeposit ?? 0;
   const limit = config.cashLimit;
+  const transactions: CashTransaction[] = txRes?.transactions ?? [];
 
-  // Filter transactions based on active tab
   const filteredTransactions = useMemo(() => {
-    if (activeTab === 'all') {
-      return mockTransactions;
-    }
-    return mockTransactions.filter((t) => t.type === activeTab);
-  }, [activeTab]);
+    if (activeTab === 'all') return transactions;
+    return transactions.filter((t) => t.type === activeTab);
+  }, [activeTab, transactions]);
 
   const handleDepositPress = () => {
     router.push('/deposit-cash');
@@ -96,16 +61,13 @@ export default function FloatingCashScreen() {
     );
   };
 
+  const isLoading = summaryLoading || txLoading;
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
             <BackIconSmall size={scale(28)} color={Theme.colors.textDark} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
@@ -113,181 +75,70 @@ export default function FloatingCashScreen() {
               Floating Cash
             </Text>
           </View>
-          <View style={{ width: scale(28), height: 0 }} />
+          <View style={{ width: scale(28) }} />
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Cash Summary Card - Show when there's cash to deposit */}
-        {cashToDeposit > 0 && (
-          <View style={styles.summaryCardContainer}>
+      {isLoading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={Theme.colors.primaryMedium} />
+        </View>
+      ) : (
+        <>
+          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <CashSummaryCard
               cashToDeposit={cashToDeposit}
               limit={limit}
               onDepositPress={handleDepositPress}
             />
-          </View>
-        )}
 
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <View style={styles.tabsBar}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'all' && styles.tabActive]}
-              onPress={() => setActiveTab('all')}
-              activeOpacity={0.7}
-            >
-              <Text
-                variant="bodySm"
-                color={Theme.colors.textDark}
-                style={styles.tabText}
-              >
-                All History
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'collected' && styles.tabActive]}
-              onPress={() => setActiveTab('collected')}
-              activeOpacity={0.7}
-            >
-              <Text
-                variant="bodySm"
-                color={Theme.colors.textDark}
-                style={styles.tabText}
-              >
-                Collected
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'deposited' && styles.tabActive]}
-              onPress={() => setActiveTab('deposited')}
-              activeOpacity={0.7}
-            >
-              <Text
-                variant="bodySm"
-                color={Theme.colors.textDark}
-                style={styles.tabText}
-              >
-                Deposited
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Transaction List */}
-        <View style={styles.transactionsList}>
-          {filteredTransactions.length > 0 ? (
-            filteredTransactions.map((transaction) => (
-              <CashHistoryItem
-                key={transaction.id}
-                transaction={transaction}
-                onPress={() => handleTransactionPress(transaction)}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Text variant="body" color={Theme.colors.textGrey} style={styles.emptyText}>
-                No transactions found
-              </Text>
+            <View style={styles.tabContainer}>
+              {(['all', 'collected', 'deposited'] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tab, activeTab === tab && styles.tabActive]}
+                  onPress={() => setActiveTab(tab)}
+                  activeOpacity={0.7}
+                >
+                  <Text variant="bodySm" color={activeTab === tab ? Theme.colors.primaryMedium : Theme.colors.textGrey} style={styles.tabText}>
+                    {tab === 'all' ? 'All' : tab === 'collected' ? 'Collected' : 'Deposited'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-        </View>
-      </ScrollView>
 
-      {/* Bottom Tab Bar */}
+            <View style={styles.transactionsList}>
+              {filteredTransactions.length === 0 ? (
+                <Text variant="bodySm" color={Theme.colors.textGrey} style={styles.emptyText}>
+                  No transactions yet
+                </Text>
+              ) : (
+                filteredTransactions.map((transaction) => (
+                  <CashHistoryItem key={transaction.id} transaction={transaction} onPress={() => handleTransactionPress(transaction)} />
+                ))
+              )}
+            </View>
+          </ScrollView>
+        </>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Theme.colors.backgroundLight,
-  },
-  header: {
-    backgroundColor: Theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.borderGrey,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: scale(21),
-    gap: 8,
-    height: scale(28),
-  },
-  backButton: {
-    width: scale(28),
-    height: scale(28),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-  },
-  title: {
-    fontSize: scale(17.5),
-    lineHeight: scale(24.5),
-    fontWeight: '700',
-  },
-  headerSpacer: {
-    width: scale(42),
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: scale(16),
-    paddingTop: verticalScale(10),
-    paddingBottom: verticalScale(100),
-    gap: verticalScale(20),
-  },
-  summaryCardContainer: {
-    paddingHorizontal: scale(0),
-  },
-  tabsContainer: {
-    paddingHorizontal: scale(0),
-  },
-  tabsBar: {
-    flexDirection: 'row',
-    backgroundColor: Theme.colors.gray100,
-    borderRadius: scale(12.75),
-    padding: scale(0),
-    gap: 0,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: scale(4),
-    paddingHorizontal: scale(7),
-    borderRadius: scale(4),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabActive: {
-    backgroundColor: Theme.colors.white,
-    ...Theme.shadows.small,
-  },
-  tabText: {
-    fontSize: scale(12.25),
-    lineHeight: scale(17.5),
-    fontWeight: '700',
-  },
-  transactionsList: {
-    gap: scale(14),
-  },
-  emptyState: {
-    paddingVertical: verticalScale(40),
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: scale(14),
-    fontWeight: '400',
-  },
+  container: { flex: 1, backgroundColor: Theme.colors.backgroundLight },
+  header: { paddingHorizontal: scale(21), paddingVertical: verticalScale(14), borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButton: { width: scale(28), height: scale(28), justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { flex: 1, alignItems: 'center' },
+  title: { fontSize: scale(17.5), lineHeight: scale(24.5), fontFamily: 'Arial', fontWeight: '700', textAlign: 'center' },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: scale(21), paddingTop: verticalScale(21), paddingBottom: verticalScale(28) },
+  tabContainer: { flexDirection: 'row', gap: scale(8), marginTop: verticalScale(21), marginBottom: verticalScale(14) },
+  tab: { flex: 1, paddingVertical: verticalScale(10), borderRadius: scale(8), backgroundColor: '#F3F4F6', alignItems: 'center' },
+  tabActive: { backgroundColor: '#E8F5E9' },
+  tabText: { fontWeight: '600' },
+  transactionsList: { gap: scale(10) },
+  emptyText: { textAlign: 'center', paddingVertical: verticalScale(24) },
 });
-

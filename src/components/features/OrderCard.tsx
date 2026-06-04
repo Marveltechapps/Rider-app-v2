@@ -12,7 +12,7 @@ import Text from '../common/Text';
 import DistanceIcon from '../icons/DistanceIcon';
 import ItemsIcon from '../icons/ItemsIcon';
 import TimeIcon from '../icons/TimeIcon';
-import SwipeToAccept from '../SwipeToAccept';
+import PrimaryActionButton from '../common/PrimaryActionButton';
 
 export interface Order {
   id: string;
@@ -154,12 +154,9 @@ export default function OrderCard({ order, mode = 'accept', onSwipeAccept, onPre
         </View>
       </View>
 
-      {/* Action: Swipe slider (Unified interaction) */}
-      <SwipeToAccept
-        label={mode === 'accept' ? 'Swipe to Accept' : 'Swipe to View Details'}
-        onAccepted={handleButtonPress}
-        variant="default"
-        threshold={0.8}
+      <PrimaryActionButton
+        label={mode === 'accept' ? 'Accept Order' : 'View Details'}
+        onPress={handleButtonPress}
       />
     </View>
   );

@@ -23,6 +23,8 @@ import { Theme } from '../constants/Theme';
 import { useUser } from '../contexts';
 import { scale, verticalScale } from '../utils/responsive';
 import { listOrders, acceptOrder, mapOrderToCard, rejectOrder, type BackendOrder } from '../api/orders';
+import { prefetchActiveOrder } from '../hooks/useActiveOrder';
+import { getWorkflowRoute, isActiveDeliveryStatus } from '../utils/orderWorkflow';
 import { riderWebSocketService } from '../services/websocket.service';
 import { getHome } from '../api/home';
 import { getMyShifts, type BackendRiderShift } from '../api/shifts';
@@ -101,6 +103,12 @@ export default function LiveOrdersScreen() {
 
   const currentShift = (homeResponse as any)?.rider?.currentShift ?? null;
   const isOnShift = Boolean(currentShift || activeBookedShift);
+  const hasAssignedWork = Boolean(
+    (homeResponse as any)?.activeTask ||
+    ((homeResponse as any)?.queue?.length ?? 0) > 0 ||
+    ((homeResponse as any)?.todaySummary?.ordersAssigned ?? 0) > 0
+  );
+  const canViewOrders = isOnShift || hasAssignedWork;
 
   const fetchOrders = useCallback(async () => {
     const res = await listOrders({ limit: 50 });
@@ -116,14 +124,16 @@ export default function LiveOrdersScreen() {
   } = useQuery({
     queryKey: ['orders', 'list', userData?.riderId],
     queryFn: fetchOrders,
-    enabled: !!userData?.riderId && isOnShift,
+    enabled: !!userData?.riderId && canViewOrders,
     staleTime: 15 * 1000,
     refetchOnWindowFocus: true, // Refetch when app comes to foreground (WebSocket is primary for real-time)
   });
 
   // WebSocket connection is managed at app level (tab layout). Here we only trigger refetch on push.
   React.useEffect(() => {
-    const handler = () => {
+    const handler = async () => {
+      await queryClient.invalidateQueries({ queryKey: ['rider-home'] });
+      await queryClient.refetchQueries({ queryKey: ['rider-home'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       refetch();
     };
@@ -134,11 +144,11 @@ export default function LiveOrdersScreen() {
   const ordersFromApi = ordersData?.orders ?? [];
 
   // When the rider goes off-shift, hide orders immediately and best-effort mark pending work as missed.
-  const lastOnShiftRef = useRef<boolean>(isOnShift);
+  const lastOnShiftRef = useRef<boolean>(canViewOrders);
   useEffect(() => {
     const wasOnShift = lastOnShiftRef.current;
-    lastOnShiftRef.current = isOnShift;
-    if (!wasOnShift || isOnShift) return;
+    lastOnShiftRef.current = canViewOrders;
+    if (!wasOnShift || canViewOrders) return;
 
     const cached = queryClient.getQueryData<any>(['orders', 'list', userData?.riderId]);
     const cachedOrders: BackendOrder[] = cached?.orders ?? [];
@@ -156,55 +166,37 @@ export default function LiveOrdersScreen() {
 
     // Hide all orders while off shift (even if cache still has data).
     queryClient.setQueryData(['orders', 'list', userData?.riderId], { orders: [], count: 0 });
-  }, [isOnShift, queryClient, userData?.riderId]);
+  }, [canViewOrders, queryClient, userData?.riderId]);
   const availableOrders: Order[] = ordersFromApi
     .filter((o) => o.status?.toLowerCase() === 'assigned' && !o.riderAssignment?.acceptedAt)
     .map((o) => mapOrderToCard(o));
   const activeOrders: Order[] = ordersFromApi
-    .filter((o) => 
-      (o.status?.toLowerCase() === 'assigned' && !!o.riderAssignment?.acceptedAt) ||
-      ['picked', 'out_for_delivery'].includes((o.status || '').toLowerCase())
-    )
-    .map((o) => mapOrderToCard(o));
-  const previouslyAssignedOrders: Order[] = ordersFromApi
-    .filter((o) => ['delivered', 'cancelled', 'returned'].includes((o.status || '').toLowerCase()))
+    .filter((o) => {
+      const s = (o.status || '').toLowerCase();
+      if (['delivered', 'cancelled', 'returned'].includes(s)) return false;
+      if (s === 'assigned' && !o.riderAssignment?.acceptedAt) return false;
+      return isActiveDeliveryStatus(s);
+    })
     .map((o) => mapOrderToCard(o));
 
   const handleOrderAccept = useCallback(
     async (orderId: string) => {
-      const backendOrder = ordersFromApi.find((o) => o._id === orderId || o.orderNumber === orderId);
-      const card = backendOrder ? mapOrderToCard(backendOrder) : { orderId, estimatedPayout: 0, pickupLocation: '', deliveryLocation: '', distance: '', time: '', items: 0 };
-      const navParams = {
-        orderId: card.orderId,
-        estimatedPayout: String(card.estimatedPayout),
-        pickupLocation: card.pickupLocation,
-        pickupBay: card.pickupBay || '',
-        deliveryLocation: card.deliveryLocation,
-        distance: card.distance,
-        time: card.time,
-        items: String(card.items),
-      };
-
       const performNavigation = () => {
-        router.push({
-          pathname: '/accepted-order',
-          params: navParams,
-        });
+        router.push({ pathname: '/accepted-order', params: { orderId } });
       };
 
       try {
         await acceptOrder(orderId);
+        await prefetchActiveOrder(queryClient, orderId);
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         refetch();
-        // Defer navigation until gesture/animation work is done so it reliably completes
         InteractionManager.runAfterInteractions(performNavigation);
       } catch (err) {
         console.error('Accept order failed:', err);
-        // Navigate even on API failure so rider can retry or see details
         InteractionManager.runAfterInteractions(performNavigation);
       }
     },
-    [ordersFromApi, router, refetch, queryClient]
+    [router, refetch, queryClient]
   );
 
   const handleOrderPress = useCallback(
@@ -212,74 +204,20 @@ export default function LiveOrdersScreen() {
       const backendOrder = ordersFromApi.find((o) => o._id === order.orderId || o.orderNumber === order.orderId);
       if (!backendOrder) return;
 
-      const status = (backendOrder.status || '').toLowerCase();
-      const accepted = !!backendOrder.riderAssignment?.acceptedAt;
-
-      // Unify the flow: Navigate to the correct step based on current status
-      if (status === 'assigned' && accepted) {
-        router.push({
-          pathname: '/accepted-order',
-          params: {
-            orderId: order.orderId,
-            estimatedPayout: order.estimatedPayout.toString(),
-            pickupLocation: order.pickupLocation,
-            pickupBay: order.pickupBay || '',
-            deliveryLocation: order.deliveryLocation,
-            distance: order.distance,
-            time: order.time,
-            items: order.items.toString(),
-          },
-        });
-      } else if (status === 'picked') {
-        router.push({
-          pathname: '/verify-hub-items',
-          params: {
-            orderId: order.orderId,
-            pickupLocation: order.pickupLocation,
-            pickupBay: order.pickupBay || '',
-            deliveryLocation: order.deliveryLocation,
-            estimatedPayout: order.estimatedPayout.toString(),
-            items: order.items.toString(),
-          },
-        });
-      } else if (status === 'out_for_delivery') {
-        router.push({
-          pathname: '/handover-order',
-          params: {
-            orderId: order.orderId,
-            customerName: backendOrder.customerPhoneNumber || 'Customer',
-            customerAddress: order.deliveryLocation,
-            estimatedPayout: order.estimatedPayout.toString(),
-            items: order.items.toString(),
-          },
-        });
-      } else {
-        // Fallback for finished orders or other states (History view)
-        router.push({
-          pathname: '/order-details',
-          params: {
-            orderId: order.orderId,
-            estimatedPayout: order.estimatedPayout.toString(),
-            pickupLocation: order.pickupLocation,
-            pickupBay: order.pickupBay || '',
-            deliveryLocation: order.deliveryLocation,
-            distance: order.distance,
-            time: order.time,
-            items: order.items.toString(),
-          },
-        });
-      }
+      void prefetchActiveOrder(queryClient, order.orderId);
+      const route = getWorkflowRoute(backendOrder);
+      router.push({ pathname: route, params: { orderId: order.orderId } });
     },
-    [router, ordersFromApi]
+    [router, ordersFromApi, queryClient]
   );
 
-  const hasOrders = availableOrders.length > 0 || activeOrders.length > 0 || previouslyAssignedOrders.length > 0;
+  const hasOrders = availableOrders.length > 0 || activeOrders.length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Header
         title="Live Orders"
-        subtitle="Available and active orders assigned to you"
+        subtitle="New assignments and deliveries in progress"
         showBackButton={false}
       />
       <ScrollView
@@ -294,7 +232,7 @@ export default function LiveOrdersScreen() {
           />
         }
       >
-        {!isOnShift ? (
+        {!canViewOrders ? (
           <View style={styles.emptyContainer}>
             <Text variant="body" color={Theme.colors.textGrey} style={styles.emptyText}>
               You’re currently not on shift.
@@ -377,30 +315,6 @@ export default function LiveOrdersScreen() {
               </View>
             )}
 
-            {previouslyAssignedOrders.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text variant="h2" color={Theme.colors.textDark} style={styles.sectionTitle}>
-                    Previously Assigned
-                  </Text>
-                  <View style={styles.badge}>
-                    <Text variant="caption" color={Theme.colors.textGrey} style={styles.badgeText}>
-                      {previouslyAssignedOrders.length}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.ordersList}>
-                  {previouslyAssignedOrders.map((order) => (
-                    <OrderCard
-                      key={order.id}
-                      order={order}
-                      mode="view"
-                      onPress={() => handleOrderPress(order)}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
           </>
         )}
       </ScrollView>

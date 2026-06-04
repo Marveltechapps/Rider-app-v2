@@ -4,8 +4,10 @@
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
-import { clearStoredAuth, getStoredAccessToken, getStoredRiderId } from '@/api/storage';
+import { clearStoredAuth, getStoredAccessToken, getStoredRiderId, getStoredOnboardingComplete, setStoredOnboardingComplete, clearStoredOnboardingStep } from '@/api/storage';
+import { AUTH_REQUIRED_MESSAGE } from '@/api/client';
 import { getMe } from '@/api/auth';
+import { logStartupNav, tokenPresenceLabel } from '@/utils/startupNavigation';
 
 interface UserData {
   name: string;
@@ -86,7 +88,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [authLoaded, setAuthLoaded] = useState(false);
 
   const updateUserData = useCallback((data: Partial<UserData>) => {
-    console.log('Updating user data:', data);
+    if (data.onboardingComplete === true) {
+      void setStoredOnboardingComplete(true);
+    }
     setUserData(prev => ({ ...prev, ...data }));
   }, []);
 
@@ -102,6 +106,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
       onboardingComplete?: boolean;
       onboardingStep?: UserData['onboardingStep'];
     }) => {
+      if (data.onboardingComplete) {
+        void setStoredOnboardingComplete(true);
+      }
       setUserData(prev => ({
         ...prev,
         ...(data.riderId != null && { riderId: data.riderId }),
@@ -132,55 +139,109 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const me = await getMe();
         if (cancelled) return;
         const p = me.profile;
-        if (p) {
-          setUserData(prev => ({
+        if (!p) return;
+
+        const backendComplete = !!p.onboardingComplete;
+        let mergedComplete = false;
+
+        setUserData(prev => {
+          mergedComplete = prev.onboardingComplete || backendComplete;
+          if (mergedComplete && !backendComplete) {
+            logStartupNav('hydrate kept local onboardingComplete', {
+              reason: 'backend_incomplete_local_complete',
+              backendComplete: false,
+              localComplete: true,
+            });
+          }
+          if (mergedComplete) {
+            void setStoredOnboardingComplete(true);
+          }
+          return {
             ...prev,
             riderId: p.id ?? prev.riderId,
             name: p.name ?? prev.name,
             phoneNumber: p.phoneNumber ?? prev.phoneNumber,
             email: p.email ?? prev.email,
-            onboardingComplete: !!p.onboardingComplete,
+            onboardingComplete: mergedComplete,
+            onboardingStep: mergedComplete ? 'complete' : prev.onboardingStep,
             preferredLocation: p.preferredLocation ?? prev.preferredLocation,
             hubId: p.preferredLocation?.hubId ?? prev.hubId,
             hubName: p.preferredLocation?.hubName ?? prev.hubName,
             vehicleType: p.vehicle?.type ?? prev.vehicleType,
             vehicleNumber: p.vehicle?.registrationNumber ?? prev.vehicleNumber,
             profilePhotoUri: p.profilePicture ?? prev.profilePhotoUri,
-          }));
-        }
-        if (!p?.onboardingComplete) {
+          };
+        });
+
+        if (!mergedComplete) {
           const { getOnboardingState } = await import('@/api/auth');
           const state = await getOnboardingState();
           if (!cancelled) {
-            setUserData(prev => ({ ...prev, onboardingStep: state.currentStep }));
+            setUserData(prev => {
+              if (prev.onboardingComplete) return prev;
+              logStartupNav('hydrate set onboardingStep from backend', {
+                step: state.currentStep,
+                reason: 'onboarding_not_complete',
+              });
+              return { ...prev, onboardingStep: state.currentStep };
+            });
           }
-        } else {
-          setUserData(prev => ({ ...prev, onboardingStep: 'complete' }));
+        } else if (!cancelled) {
+          void clearStoredOnboardingStep();
         }
+
+        logStartupNav('session hydrated from backend', {
+          backendOnboardingComplete: backendComplete,
+          mergedOnboardingComplete: mergedComplete,
+          reason: 'backend_hydrated',
+        });
       } catch (e) {
         if (cancelled) return;
-        await clearStoredAuth();
-        setUserData(initialUserData);
-        console.warn('Failed to restore session (backend unreachable or session expired):', e);
+        const isAuthFailure =
+          (e instanceof Error && e.message === AUTH_REQUIRED_MESSAGE) ||
+          (typeof e === 'object' && e !== null && (e as { code?: string }).code === 'AUTH_REQUIRED');
+        if (isAuthFailure) {
+          await clearStoredAuth();
+          setUserData(initialUserData);
+          console.warn('Session expired — please log in again.');
+          return;
+        }
+        // Backend unreachable: keep cached token so rider stays logged in offline / on slow network
+        console.warn('Could not refresh profile; using saved session:', e);
       }
     };
 
     (async () => {
       try {
-        const [riderId, accessToken] = await Promise.all([getStoredRiderId(), getStoredAccessToken()]);
+        const [riderId, accessToken, storedComplete] = await Promise.all([
+          getStoredRiderId(),
+          getStoredAccessToken(),
+          getStoredOnboardingComplete(),
+        ]);
         if (cancelled) return;
         if (!accessToken) {
+          logStartupNav('boot read storage', {
+            accessToken: tokenPresenceLabel(accessToken),
+            riderId: riderId ?? 'missing',
+            storedOnboardingComplete: storedComplete,
+          });
           setUserData(initialUserData);
           setAuthLoaded(true);
           return;
         }
-        if (riderId) {
-          setUserData(prev => ({ ...prev, riderId }));
-        }
+        logStartupNav('boot read storage', {
+          accessToken: tokenPresenceLabel(accessToken),
+          riderId: riderId ?? 'missing',
+          storedOnboardingComplete: storedComplete,
+        });
+        setUserData(prev => ({
+          ...prev,
+          ...(riderId ? { riderId } : {}),
+          onboardingComplete: storedComplete,
+          ...(storedComplete ? { onboardingStep: 'complete' as const } : {}),
+        }));
         setAuthLoaded(true);
-        if (riderId) {
-          void hydrateSessionFromBackend();
-        }
+        void hydrateSessionFromBackend();
       } catch (err) {
         console.error('Critical error during UserProvider mount:', err);
         if (!cancelled) setAuthLoaded(true);

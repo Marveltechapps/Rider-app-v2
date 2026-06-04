@@ -6,10 +6,11 @@
  */
 
 import React from 'react';
-import { TouchableOpacity, View, StyleSheet, ViewStyle, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ViewStyle, ActivityIndicator } from 'react-native';
 import { Theme } from '../../constants/Theme';
 import { scale } from '../../utils/responsive';
 import Text from './Text';
+import AppPressable from './AppPressable';
 
 interface ButtonProps {
   title: string;
@@ -39,7 +40,7 @@ export default function Button({
   const isDisabled = disabled || loading;
 
   return (
-    <TouchableOpacity
+    <AppPressable
       style={[
         styles.button,
         styles[variant],
@@ -50,7 +51,7 @@ export default function Button({
       ]}
       onPress={onPress}
       disabled={isDisabled}
-      activeOpacity={0.7}
+      minTouchSize={scale(48)}
     >
       {loading ? (
         <ActivityIndicator color={variant === 'primary' ? Theme.colors.white : Theme.colors.primary} />
@@ -67,7 +68,7 @@ export default function Button({
           {icon && iconPosition === 'right' && <View style={styles.iconRight}>{icon}</View>}
         </View>
       )}
-    </TouchableOpacity>
+    </AppPressable>
   );
 }
 

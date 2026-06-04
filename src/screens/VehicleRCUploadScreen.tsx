@@ -25,12 +25,14 @@ import VehicleIcon from '../components/icons/VehicleIcon';
 import Header from '../components/layout/Header';
 import { Theme } from '../constants/Theme';
 import { scale, verticalScale } from '../utils/responsive';
-import { uploadKycDocument } from '../api/kyc';
+import { invalidateKycStatusCache, uploadKycDocument } from '../api/kyc';
+import { useQueryClient } from '@tanstack/react-query';
 import { goBackOrReplace, resolveUploadBackFallback } from '../utils/navigation/safeBack';
 
 export default function VehicleRCUploadScreen() {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const queryClient = useQueryClient();
   const [documentUri, setDocumentUri] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -77,8 +79,13 @@ export default function VehicleRCUploadScreen() {
     setError('');
     try {
       const result = await uploadKycDocument(documentUri, 'vehicleRC', 'vehicle-rc.jpg');
+      await invalidateKycStatusCache(queryClient);
       const uploadedLink = (result && (result.uploadedLink || (result as any).uploadedLink)) ?? undefined;
-      router.replace({ pathname: '/kyc-upload', params: { updatedDoc: 'vehicleRC', uploadedLink } });
+      if (returnTo === '/my-documents') {
+        router.replace('/my-documents' as any);
+      } else {
+        router.replace({ pathname: '/kyc-upload', params: { updatedDoc: 'vehicleRC', uploadedLink } });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed. Please try again.');
     } finally {

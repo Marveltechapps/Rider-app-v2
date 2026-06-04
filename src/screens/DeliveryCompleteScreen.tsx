@@ -6,34 +6,41 @@
 
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Animated, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Animated, BackHandler, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import Text from '../components/common/Text';
 import CheckCircleIcon from '../components/icons/CheckCircleIcon';
 import CheckmarkIcon from '../components/icons/CheckmarkIcon';
 import RupeeIcon from '../components/icons/RupeeIcon';
 import { Theme } from '../constants/Theme';
+import { clearActiveOrderCache, useActiveOrder } from '../hooks/useActiveOrder';
 import deliveryCompleteStyles from '../styles/deliveryCompleteStyles';
-import { scale } from '../utils/responsive';
+import { getOrderDistanceLabel } from '../utils/fleetMapCoords';
+import { goBackOrReplace } from '../utils/navigation/safeBack';
+import { scale, verticalScale } from '../utils/responsive';
 
 interface DeliveryCompleteScreenProps {
   orderId?: string;
-  customerName?: string;
   estimatedPayout?: string;
-  incentive?: string;
-  totalTime?: string;
   distance?: string;
 }
 
 export default function DeliveryCompleteScreen(props: DeliveryCompleteScreenProps = {}) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
-  const orderId = Array.isArray(props.orderId) ? props.orderId[0] : props.orderId || 'ORD240001';
-  const customerName = Array.isArray(props.customerName) ? props.customerName[0] : props.customerName || 'Rajesh';
-  const estimatedPayout = Array.isArray(props.estimatedPayout) ? props.estimatedPayout[0] : props.estimatedPayout || '65';
-  const incentive = Array.isArray(props.incentive) ? props.incentive[0] : props.incentive || '15';
-  const totalTime = Array.isArray(props.totalTime) ? props.totalTime[0] : props.totalTime || '24m';
-  const distance = Array.isArray(props.distance) ? props.distance[0] : props.distance || '4.1 km';
+  const orderId = Array.isArray(props.orderId) ? props.orderId[0] : props.orderId || '';
+  const { order, isLoading } = useActiveOrder(orderId);
+
+  const estimatedPayout =
+    order?.estimatedPayout ??
+    order?.pricing?.deliveryFee ??
+    (props.estimatedPayout ? parseFloat(String(props.estimatedPayout)) : 0);
+  const distance = getOrderDistanceLabel(order) || props.distance || '';
+  const etaMinutes = order?.metadata?.etaMinutes;
+  const totalTime = etaMinutes ? `${etaMinutes}m` : '';
 
   // Animation values for checkmark
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -77,29 +84,27 @@ export default function DeliveryCompleteScreen(props: DeliveryCompleteScreenProp
   }, [scaleAnim, opacityAnim, checkmarkScaleAnim, checkmarkOpacityAnim]);
 
   const handleBackToHome = useCallback(() => {
-    try {
-      router.replace('/(tabs)');
-    } catch (error) {
-      console.error('Error navigating to home:', error);
+    if (orderId) {
+      clearActiveOrderCache(queryClient, orderId);
     }
-  }, [router]);
+    try {
+      goBackOrReplace(router, '/(tabs)');
+    } catch {
+      router.replace('/(tabs)');
+    }
+  }, [router, queryClient, orderId]);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBackToHome();
+      return true;
+    });
+    return () => sub.remove();
+  }, [handleBackToHome]);
 
   return (
     <SafeAreaView style={deliveryCompleteStyles.container} edges={['top', 'bottom']}>
       <View style={deliveryCompleteStyles.mainContainer}>
-        {/* Top Header - Back to Home Button */}
-        <View style={deliveryCompleteStyles.topHeader}>
-          <TouchableOpacity
-            style={deliveryCompleteStyles.homeButton}
-            onPress={handleBackToHome}
-            activeOpacity={0.8}
-          >
-            <Text variant="body" color={Theme.colors.primaryMedium} style={deliveryCompleteStyles.homeButtonText}>
-              Back to Home
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Decorative Background Circles */}
         <View style={deliveryCompleteStyles.backgroundCircles}>
           <View style={deliveryCompleteStyles.circle1} />
@@ -137,7 +142,7 @@ export default function DeliveryCompleteScreen(props: DeliveryCompleteScreenProp
 
         {/* Subtitle */}
         <Text variant="body" color="rgba(255, 255, 255, 0.8)" style={deliveryCompleteStyles.subtitle}>
-          Great job, {customerName}!
+          {isLoading ? 'Loading…' : `Order ${order?.orderNumber || orderId} completed`}
         </Text>
 
         {/* Earnings Card */}
@@ -155,35 +160,41 @@ export default function DeliveryCompleteScreen(props: DeliveryCompleteScreenProp
             </Text>
           </View>
 
-          {/* Divider */}
-          <View style={deliveryCompleteStyles.divider} />
-
-          {/* Incentive Badge */}
-          <View style={deliveryCompleteStyles.incentiveRow}>
-            <View style={deliveryCompleteStyles.incentiveBadge}>
-              <View style={deliveryCompleteStyles.incentiveIconContainer}>
-                <CheckCircleIcon size={scale(14)} color={Theme.colors.primaryMedium} />
+          {/* Incentive Badge — only when backend provides incentive data */}
+          {order?.pricing?.discount ? (
+            <>
+              <View style={deliveryCompleteStyles.divider} />
+              <View style={deliveryCompleteStyles.incentiveRow}>
+                <View style={deliveryCompleteStyles.incentiveBadge}>
+                  <View style={deliveryCompleteStyles.incentiveIconContainer}>
+                    <CheckCircleIcon size={scale(14)} color={Theme.colors.primaryMedium} />
+                  </View>
+                  <Text variant="bodySm" color="#4A5565" style={deliveryCompleteStyles.incentiveLabel}>
+                    Discount applied
+                  </Text>
+                </View>
+                <Text variant="bodySm" color={Theme.colors.primaryMedium} style={deliveryCompleteStyles.incentiveAmount}>
+                  ₹{order.pricing.discount}
+                </Text>
               </View>
-              <Text variant="bodySm" color="#4A5565" style={deliveryCompleteStyles.incentiveLabel}>
-                Incentive
-              </Text>
-            </View>
-            <Text variant="bodySm" color={Theme.colors.primaryMedium} style={deliveryCompleteStyles.incentiveAmount}>
-              + ₹{incentive}
-            </Text>
-          </View>
+            </>
+          ) : null}
         </View>
 
         {/* Info Cards */}
+        {(totalTime || distance) ? (
         <View style={deliveryCompleteStyles.infoCardsRow}>
+          {totalTime ? (
           <View style={deliveryCompleteStyles.infoCard}>
             <Text variant="caption" color="rgba(255, 255, 255, 0.6)" style={deliveryCompleteStyles.infoLabel}>
-              Total Time
+              ETA
             </Text>
             <Text variant="h3" color={Theme.colors.white} style={deliveryCompleteStyles.infoValue}>
               {totalTime}
             </Text>
           </View>
+          ) : null}
+          {distance ? (
           <View style={deliveryCompleteStyles.infoCard}>
             <Text variant="caption" color="rgba(255, 255, 255, 0.6)" style={deliveryCompleteStyles.infoLabel}>
               Distance
@@ -192,8 +203,29 @@ export default function DeliveryCompleteScreen(props: DeliveryCompleteScreenProp
               {distance}
             </Text>
           </View>
+          ) : null}
         </View>
+        ) : null}
       </View>
+
+        <View
+          style={[
+            deliveryCompleteStyles.bottomFooter,
+            { paddingBottom: Math.max(insets.bottom, verticalScale(12)) },
+          ]}
+        >
+          <TouchableOpacity
+            style={deliveryCompleteStyles.homeButton}
+            onPress={handleBackToHome}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Back to Home"
+          >
+            <Text variant="body" color={Theme.colors.primaryMedium} style={deliveryCompleteStyles.homeButtonText}>
+              Back to Home
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );

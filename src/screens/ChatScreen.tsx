@@ -1,212 +1,247 @@
 /**
- * Chat Screen Component
- * Live chat support interface with modern UX/UI
+ * Live Chat Support — real-time chat with dashboard support team
  */
 
 import { useRouter } from 'expo-router';
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Text from '../components/common/Text';
+import AppPressable from '../components/common/AppPressable';
 import Header from '../components/layout/Header';
-import ChatIcon from '../components/icons/ChatIcon';
 import SendIcon from '../components/icons/ArrowRightIcon';
+import {
+  fetchMySupportChat,
+  sendSupportChatMessage,
+  markSupportChatRead,
+  type SupportMessage,
+  type SupportConversation,
+} from '../api/supportChat';
+import { supportChatSocket } from '../services/supportChatSocket';
 import chatStyles from '../styles/chatStyles';
-import { scale, verticalScale } from '../utils/responsive';
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'support';
-  timestamp: Date;
-}
+import { scale } from '../utils/responsive';
 
 export default function ChatScreen() {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: 'Hello! I\'m here to help you. How can I assist you today?',
-      sender: 'support',
-      timestamp: new Date(Date.now() - 60000),
-    },
-  ]);
+  const [conversation, setConversation] = useState<SupportConversation | null>(null);
+  const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const handleSend = useCallback(() => {
-    if (!inputText.trim()) return;
+  const appendMessage = useCallback((msg: SupportMessage) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.messageId === msg.messageId)) return prev;
+      return [...prev, msg];
+    });
+  }, []);
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      sender: 'user',
-      timestamp: new Date(),
-    };
+  const loadChat = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await fetchMySupportChat();
+      setConversation(data.conversation);
+      setMessages(data.messages);
+      await markSupportChatRead();
+      supportChatSocket.connect();
+      supportChatSocket.joinConversation(data.conversation.conversationId);
+    } catch (e) {
+      console.error('[ChatScreen] load failed', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    setMessages((prev) => [...prev, newMessage]);
-    setInputText('');
-    setIsTyping(true);
-
-    // Simulate support response after 2 seconds
-    setTimeout(() => {
-      setIsTyping(false);
-      const supportResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: 'Thank you for your message. Our support team is looking into this and will get back to you shortly.',
-        sender: 'support',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, supportResponse]);
-    }, 2000);
-  }, [inputText]);
+  const conversationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  }, [messages, isTyping]);
+    void loadChat();
+  }, [loadChat]);
 
-  const formatTime = (date: Date) => {
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  useEffect(() => {
+    conversationIdRef.current = conversation?.conversationId ?? null;
+  }, [conversation?.conversationId]);
+
+  useEffect(() => {
+    return () => {
+      const id = conversationIdRef.current;
+      if (id) supportChatSocket.leaveConversation(id);
+      supportChatSocket.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const onMessage = (payload: {
+      conversation?: SupportConversation;
+      message?: SupportMessage;
+    }) => {
+      if (payload.conversation) setConversation(payload.conversation);
+      if (payload.message) {
+        appendMessage(payload.message);
+        if (payload.message.senderType === 'admin') {
+          void markSupportChatRead();
+        }
+      }
+    };
+    supportChatSocket.on('support:message', onMessage);
+    return () => supportChatSocket.off('support:message', onMessage);
+  }, [appendMessage]);
+
+  useEffect(() => {
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 80);
+  }, [messages]);
+
+  const handleSend = useCallback(async () => {
+    if (!inputText.trim() || sending || !conversation) return;
+    const text = inputText.trim();
+    const clientMessageId = `rider-${Date.now()}`;
+    setInputText('');
+    setSending(true);
+
+    const optimistic: SupportMessage = {
+      messageId: clientMessageId,
+      conversationId: conversation.conversationId,
+      senderType: 'rider',
+      senderId: conversation.riderId,
+      senderName: conversation.riderName,
+      body: text,
+      clientMessageId,
+      createdAt: new Date().toISOString(),
+    };
+    appendMessage(optimistic);
+
+    try {
+      const result = await sendSupportChatMessage(text, clientMessageId);
+      setConversation(result.conversation);
+      setMessages((prev) => {
+        const withoutOpt = prev.filter((m) => m.messageId !== clientMessageId);
+        if (withoutOpt.some((m) => m.messageId === result.message.messageId)) return withoutOpt;
+        return [...withoutOpt, result.message];
+      });
+    } catch (e) {
+      setMessages((prev) => prev.filter((m) => m.messageId !== clientMessageId));
+      setInputText(text);
+      console.error('[ChatScreen] send failed', e);
+    } finally {
+      setSending(false);
+    }
+  }, [inputText, sending, conversation, appendMessage]);
+
+  const formatTime = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={chatStyles.container} edges={['top', 'bottom']}>
+        <Header title="Live Chat Support" onBack={() => router.back()} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#32C96A" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={chatStyles.container} edges={['top', 'bottom']}>
-      {/* Header */}
       <Header
         title="Live Chat Support"
-        subtitle="We typically reply within a few minutes"
+        subtitle="Chat with our support team"
         onBack={() => router.back()}
       />
-
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={chatStyles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {/* Messages List */}
         <ScrollView
           ref={scrollViewRef}
           style={chatStyles.messagesContainer}
           contentContainerStyle={chatStyles.messagesContent}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => {
-            scrollViewRef.current?.scrollToEnd({ animated: true });
-          }}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Support Agent Info Card */}
-          <View style={chatStyles.agentCard}>
-            <View style={chatStyles.agentAvatar}>
-              <ChatIcon size={scale(20)} color="#32C96A" />
-            </View>
-            <View style={chatStyles.agentInfo}>
-              <Text variant="body" color="#101828" style={chatStyles.agentName}>
-                Support Agent
-              </Text>
-              <Text variant="caption" color="#6A7282" style={chatStyles.agentStatus}>
-                Online • Usually replies in 2 minutes
+          {messages.length === 0 ? (
+            <View style={chatStyles.emptyState}>
+              <Text variant="body" color="#6A7282">
+                Send a message to start the conversation.
               </Text>
             </View>
-          </View>
-
-          {/* Messages */}
-          {messages.map((message) => (
-            <View
-              key={message.id}
-              style={[
-                chatStyles.messageWrapper,
-                message.sender === 'user' && chatStyles.messageWrapperUser,
-              ]}
-            >
-              <View
-                style={[
-                  chatStyles.messageBubble,
-                  message.sender === 'user'
-                    ? chatStyles.messageBubbleUser
-                    : chatStyles.messageBubbleSupport,
-                ]}
-              >
-                <Text
-                  variant="body"
+          ) : (
+            messages.map((message) => {
+              const isUser = message.senderType === 'rider';
+              return (
+                <View
+                  key={message.messageId}
                   style={[
-                    chatStyles.messageText,
-                    message.sender === 'user'
-                      ? chatStyles.messageTextUser
-                      : chatStyles.messageTextSupport,
+                    chatStyles.messageWrapper,
+                    isUser ? chatStyles.userMessageWrapper : chatStyles.supportMessageWrapper,
                   ]}
                 >
-                  {message.text}
-                </Text>
-                <Text
-                  variant="caption"
-                  style={[
-                    chatStyles.messageTime,
-                    message.sender === 'user'
-                      ? chatStyles.messageTimeUser
-                      : chatStyles.messageTimeSupport,
-                  ]}
-                >
-                  {formatTime(message.timestamp)}
-                </Text>
-              </View>
-            </View>
-          ))}
-
-          {/* Typing Indicator */}
-          {isTyping && (
-            <View style={chatStyles.messageWrapper}>
-              <View style={[chatStyles.messageBubble, chatStyles.messageBubbleSupport]}>
-                <View style={chatStyles.typingIndicator}>
-                  <View style={[chatStyles.typingDot, chatStyles.typingDot1]} />
-                  <View style={[chatStyles.typingDot, chatStyles.typingDot2]} />
-                  <View style={[chatStyles.typingDot, chatStyles.typingDot3]} />
+                  <View
+                    style={[
+                      chatStyles.messageBubble,
+                      isUser ? chatStyles.userBubble : chatStyles.supportBubble,
+                    ]}
+                  >
+                    <Text
+                      variant="body"
+                      style={isUser ? chatStyles.userMessageText : chatStyles.supportMessageText}
+                    >
+                      {message.body}
+                    </Text>
+                    <Text
+                      variant="caption"
+                      style={isUser ? chatStyles.userTimestamp : chatStyles.supportTimestamp}
+                    >
+                      {formatTime(message.createdAt)}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            </View>
+              );
+            })
           )}
         </ScrollView>
 
-        {/* Input Area */}
         <View style={chatStyles.inputContainer}>
-          <View style={chatStyles.inputWrapper}>
+          <View style={chatStyles.inputRow}>
             <TextInput
-              style={chatStyles.input}
+              style={chatStyles.textInput}
               placeholder="Type your message..."
               placeholderTextColor="#9CA3AF"
               value={inputText}
               onChangeText={setInputText}
               multiline
-              maxLength={500}
-              textAlignVertical="center"
+              maxLength={2000}
+              editable={conversation?.status !== 'resolved'}
             />
-            <TouchableOpacity
+            <AppPressable
               style={[
                 chatStyles.sendButton,
-                !inputText.trim() && chatStyles.sendButtonDisabled,
+                (!inputText.trim() || sending) && chatStyles.sendButtonDisabled,
               ]}
               onPress={handleSend}
-              disabled={!inputText.trim()}
-              activeOpacity={0.7}
+              disabled={!inputText.trim() || sending || conversation?.status === 'resolved'}
+              minTouchSize={44}
             >
-              <SendIcon size={scale(18)} color={inputText.trim() ? '#FFFFFF' : '#9CA3AF'} />
-            </TouchableOpacity>
+              {sending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <SendIcon size={scale(20)} color="#FFFFFF" />
+              )}
+            </AppPressable>
           </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
-

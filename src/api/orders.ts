@@ -3,6 +3,11 @@
  */
 
 import { api } from './client';
+import { API_BASE_URL_ENV_KEY, getBaseUrlOrThrow } from './config';
+import { asRecord, getApiErrorMessage } from './parseResponse';
+import { getStoredAccessToken } from './storage';
+import { isValidIndianMobile, toTenDigitMobile } from '../utils/phoneNumber';
+import { formatDeliveryAddress, getOrderDistanceLabel, getPickupLabel } from '../utils/fleetMapCoords';
 
 export interface OrderItem {
   skuId: string;
@@ -46,6 +51,9 @@ export interface OrderPricing {
 export interface RiderAssignment {
   riderId: string;
   assignedAt?: string;
+  acceptedAt?: string;
+  arrivedAtDarkstore?: string;
+  arrivedAtCustomer?: string;
   pickedAt?: string;
   deliveredAt?: string;
 }
@@ -65,7 +73,23 @@ export interface BackendOrder {
   status: string;
   estimatedPayout?: number;
   createdAt?: string;
-  metadata?: { etaMinutes?: number; estimatedDistanceKm?: number };
+  metadata?: {
+    etaMinutes?: number;
+    estimatedDistanceKm?: number;
+    pickupCoordinates?: { lat: number; lng: number };
+    dropCoordinates?: { lat: number; lng: number };
+    pickupAddress?: string;
+    deliveryOtp?: string;
+    deliveryOtpSentAt?: string;
+    deliveryOtpVerifiedAt?: string;
+    deliveryProofPhotoUrl?: string;
+    deliveryProofPhotoKey?: string;
+    bagCollectedAt?: string;
+    bagId?: string;
+    assignedBagId?: string;
+    rackLocation?: string;
+    bagVerifiedAt?: string;
+  };
 }
 
 export interface ListOrdersResponse {
@@ -102,7 +126,17 @@ export async function rejectOrder(orderId: string, reason?: string): Promise<{ o
   return api.post<{ order: BackendOrder }>(`/api/v1/orders/${orderId}/reject`, reason ? { reason } : {});
 }
 
-/** Mark order as picked */
+/** Mark rider arrived at darkstore */
+export async function arrivedAtDarkstore(orderId: string): Promise<{ order: BackendOrder }> {
+  return api.post<{ order: BackendOrder }>(`/api/v1/orders/${orderId}/arrived-at-darkstore`, {});
+}
+
+/** Mark rider arrived at customer */
+export async function arrivedAtCustomer(orderId: string): Promise<{ order: BackendOrder }> {
+  return api.post<{ order: BackendOrder }>(`/api/v1/orders/${orderId}/arrived-at-customer`, {});
+}
+
+/** Mark order as picked (bag collected) */
 export async function pickOrder(orderId: string): Promise<{ order: BackendOrder }> {
   return api.post<{ order: BackendOrder }>(`/api/v1/orders/${orderId}/pick`, {});
 }
@@ -130,30 +164,207 @@ export async function getUpiIntent(orderId: string): Promise<{ upiUri: string; v
   return api.get<{ upiUri: string; vpa: string; payeeName: string; amount: number; orderNumber: string }>(`/api/v1/orders/${orderId}/payment/upi-intent`);
 }
 
-/** Upload delivery proof photo and receive a public URL */
-export async function uploadDeliveryProofPhoto(orderId: string, file: { uri: string; name?: string; type?: string }): Promise<{ url: string; key: string }> {
+/** Upload delivery proof photo to AWS S3 (via backend) and receive public URL + key */
+export async function uploadDeliveryProofPhoto(
+  orderId: string,
+  file: { uri: string; name?: string; type?: string }
+): Promise<{ success: boolean; url: string; key?: string; message?: string }> {
   const form = new FormData();
   form.append('file', {
-    // React Native / Expo FormData file type
     uri: file.uri,
     name: file.name ?? 'proof.jpg',
     type: file.type ?? 'image/jpeg',
   } as any);
-  // Do not set Content-Type manually; fetch will add the correct boundary for multipart.
-  return api.post<{ url: string; key: string }>(`/api/v1/orders/${orderId}/proof/photo`, form);
+  const raw = await api.post<Record<string, unknown>>(`/api/v1/orders/${orderId}/proof/photo`, form);
+  const body = asRecord(raw);
+  const url = typeof body.url === 'string' ? body.url : '';
+  if (!url) {
+    throw new Error(getApiErrorMessage(body, 500) || 'Photo upload failed');
+  }
+  return {
+    success: body.success !== false,
+    url,
+    key: typeof body.key === 'string' ? body.key : undefined,
+    message: typeof body.message === 'string' ? body.message : undefined,
+  };
 }
 
-/** Send delivery OTP to the customer for this order */
+export type DeliveryOtpSendResult = {
+  success: boolean;
+  otpSent: boolean;
+  message: string;
+  expiresInSec?: number;
+  mobileNumber?: string;
+};
+
+export type DeliveryOtpVerifyResult = {
+  success: boolean;
+  verified: boolean;
+  message?: string;
+};
+
+/** Send delivery OTP to the customer's mobile (rider must tap Send OTP). */
 export async function sendDeliveryOtp(
   orderId: string,
   args?: { mobileNumber?: string }
-): Promise<{ message: string; expiresInSec?: number }> {
-  return api.post<{ message: string; expiresInSec?: number }>(`/api/v1/orders/${orderId}/otp/send`, args?.mobileNumber ? { mobileNumber: args.mobileNumber } : {});
+): Promise<DeliveryOtpSendResult> {
+  const mobile = args?.mobileNumber ? toTenDigitMobile(args.mobileNumber) : '';
+  if (mobile && !isValidIndianMobile(mobile)) {
+    throw new Error('Phone number must be 10 digits (or 12 with 91).');
+  }
+  const base = getBaseUrlOrThrow();
+  const token = await getStoredAccessToken();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${base}/api/v1/orders/${orderId}/otp/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(mobile ? { mobileNumber: mobile } : {}),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const raw = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(getApiErrorMessage(asRecord(raw), res.status));
+    }
+    const body = asRecord(raw);
+    const expiresIn =
+      typeof body.expiresIn === 'number'
+        ? body.expiresIn
+        : typeof body.expiresInSec === 'number'
+          ? body.expiresInSec
+          : undefined;
+    return {
+      success: body.success !== false,
+      otpSent: body.otpSent !== false,
+      message: typeof body.message === 'string' ? body.message : 'OTP sent successfully',
+      expiresInSec: expiresIn,
+      mobileNumber: typeof body.mobileNumber === 'string' ? body.mobileNumber : mobile || undefined,
+    };
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error) {
+      const message = err.message || '';
+      if (
+        message.includes('API base URL') ||
+        message.includes(API_BASE_URL_ENV_KEY) ||
+        message.includes('is not set')
+      ) {
+        throw err;
+      }
+      if (
+        err.name === 'AbortError' ||
+        message.includes('Network request failed') ||
+        message.includes('Failed to fetch')
+      ) {
+        throw new Error('Unable to send OTP right now. Please try again in a moment.');
+      }
+      throw err;
+    }
+    throw err;
+  }
 }
 
-/** Verify delivery OTP for this order */
-export async function verifyDeliveryOtp(orderId: string, otp: string): Promise<{ verified: boolean; message?: string }> {
-  return api.post<{ verified: boolean; message?: string }>(`/api/v1/orders/${orderId}/otp/verify`, { otp });
+/** Resend delivery OTP (same as send; new code + expiry). */
+export async function resendDeliveryOtp(
+  orderId: string,
+  args?: { mobileNumber?: string }
+): Promise<DeliveryOtpSendResult> {
+  const mobile = args?.mobileNumber ? toTenDigitMobile(args.mobileNumber) : '';
+  if (mobile && !isValidIndianMobile(mobile)) {
+    throw new Error('Phone number must be 10 digits (or 12 with 91).');
+  }
+  const base = getBaseUrlOrThrow();
+  const token = await getStoredAccessToken();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${base}/api/v1/orders/${orderId}/otp/resend`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(mobile ? { mobileNumber: mobile } : {}),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const raw = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(getApiErrorMessage(asRecord(raw), res.status));
+    }
+    const body = asRecord(raw);
+    const expiresIn =
+      typeof body.expiresIn === 'number'
+        ? body.expiresIn
+        : typeof body.expiresInSec === 'number'
+          ? body.expiresInSec
+          : undefined;
+    return {
+      success: body.success !== false,
+      otpSent: body.otpSent !== false,
+      message: typeof body.message === 'string' ? body.message : 'OTP resent successfully',
+      expiresInSec: expiresIn,
+      mobileNumber: typeof body.mobileNumber === 'string' ? body.mobileNumber : mobile || undefined,
+    };
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error) {
+      const message = err.message || '';
+      if (
+        err.name === 'AbortError' ||
+        message.includes('Network request failed') ||
+        message.includes('Failed to fetch')
+      ) {
+        throw new Error('Unable to resend OTP right now. Please try again in a moment.');
+      }
+      throw err;
+    }
+    throw err;
+  }
+}
+
+/** Verify delivery OTP server-side. Returns verified:false on wrong/expired OTP without throwing. */
+export async function verifyDeliveryOtp(
+  orderId: string,
+  otp: string
+): Promise<DeliveryOtpVerifyResult> {
+  const digits = otp.replace(/\D/g, '').trim();
+  const base = getBaseUrlOrThrow();
+  const token = await getStoredAccessToken();
+  const res = await fetch(`${base}/api/v1/orders/${orderId}/otp/verify`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ otp: digits }),
+  });
+  const raw = await res.json().catch(() => ({}));
+  const body = asRecord(raw);
+  if (res.ok) {
+    const verified = body.verified === true;
+    return {
+      success: body.success !== false && verified,
+      verified,
+      message: typeof body.message === 'string' ? body.message : undefined,
+    };
+  }
+  if (body.verified === false || res.status === 400 || res.status === 403 || res.status === 404) {
+    return {
+      success: false,
+      verified: false,
+      message:
+        (typeof body.message === 'string' && body.message) ||
+        (typeof body.error === 'string' && body.error) ||
+        getApiErrorMessage(body, res.status),
+    };
+  }
+  throw new Error(getApiErrorMessage(body, res.status));
 }
 
 /** Map backend order to history list Order shape (OrderCard in history). */
@@ -207,9 +418,7 @@ function formatDeliveryTime(order: BackendOrder): string {
 
 /** Format distance from metadata or coordinates */
 function formatDistance(order: BackendOrder): string {
-  const km = order.metadata?.estimatedDistanceKm;
-  if (km != null && km > 0) return `~${km.toFixed(1)} km`;
-  return '—';
+  return getOrderDistanceLabel(order);
 }
 
 /** Map backend order to frontend OrderCard shape. orderId is set to _id so API calls (pick, deliver) work. */
@@ -226,17 +435,14 @@ export function mapOrderToCard(order: BackendOrder): {
   items: number;
   isPriority?: boolean;
 } {
-  const addr = order.delivery?.address;
-  const deliveryLine = addr
-    ? [addr.addressLine1, addr.addressLine2, addr.city, addr.pincode].filter(Boolean).join(', ')
-    : 'Delivery address';
+  const deliveryLine = formatDeliveryAddress(order);
   const itemCount = order.items?.reduce((s, i) => s + (i.quantity || 0), 0) ?? 0;
   return {
     id: order._id,
     orderId: order._id, // use _id so pick/deliver API receives valid id
     displayOrderNumber: order.orderNumber || order._id,
     estimatedPayout: order.estimatedPayout ?? 0,
-    pickupLocation: (order.darkstoreCode || order.warehouseCode) ? `Darkstore ${order.darkstoreCode || order.warehouseCode}` : 'Hub',
+    pickupLocation: getPickupLabel(order) || 'Hub',
     deliveryLocation: deliveryLine,
     distance: formatDistance(order),
     time: formatDeliveryTime(order),

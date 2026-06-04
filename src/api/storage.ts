@@ -9,6 +9,7 @@ const KEY_ACCESS = 'rider_access_token';
 const KEY_REFRESH = 'rider_refresh_token';
 const KEY_RIDER_ID = 'rider_id';
 const KEY_ONBOARD_STEP = 'onboarding_step';
+const KEY_ONBOARDING_COMPLETE = 'onboarding_complete';
 
 const PREFIX = 'rider_auth_';
 
@@ -94,6 +95,7 @@ export async function clearStoredAuth(): Promise<void> {
     await webDelete(K.access);
     await webDelete(K.refresh);
     await webDelete(K.riderId);
+    await webDelete(KEY_ONBOARDING_COMPLETE);
     return;
   }
   const SecureStore = await import('expo-secure-store');
@@ -101,6 +103,7 @@ export async function clearStoredAuth(): Promise<void> {
     SecureStore.deleteItemAsync(K.access),
     SecureStore.deleteItemAsync(K.refresh),
     SecureStore.deleteItemAsync(K.riderId),
+    SecureStore.deleteItemAsync(KEY_ONBOARDING_COMPLETE),
   ]);
 }
 
@@ -131,4 +134,33 @@ export async function getStoredOnboardingStep(): Promise<string | null> {
 
 export async function clearStoredOnboardingStep(): Promise<void> {
   return setStoredOnboardingStep(null);
+}
+
+export async function setStoredOnboardingComplete(complete: boolean): Promise<void> {
+  const value = complete ? 'true' : 'false';
+  if (isWeb()) {
+    await webSet(KEY_ONBOARDING_COMPLETE, value);
+    return;
+  }
+  const SecureStore = await import('expo-secure-store');
+  await SecureStore.setItemAsync(KEY_ONBOARDING_COMPLETE, value);
+}
+
+export async function getStoredOnboardingComplete(): Promise<boolean> {
+  const raw = isWeb()
+    ? await webGet(KEY_ONBOARDING_COMPLETE)
+    : await (async () => {
+        const SecureStore = await import('expo-secure-store');
+        return SecureStore.getItemAsync(KEY_ONBOARDING_COMPLETE);
+      })();
+  return raw === 'true';
+}
+
+export async function clearStoredOnboardingComplete(): Promise<void> {
+  if (isWeb()) {
+    await webDelete(KEY_ONBOARDING_COMPLETE);
+    return;
+  }
+  const SecureStore = await import('expo-secure-store');
+  await SecureStore.deleteItemAsync(KEY_ONBOARDING_COMPLETE);
 }

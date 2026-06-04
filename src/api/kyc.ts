@@ -137,3 +137,12 @@ export async function uploadKycDocument(
 
   return unwrapApiPayload<UploadKycResponse>(data);
 }
+
+/** React Query key — invalidate after upload / on My Documents focus */
+export const KYC_STATUS_QUERY_KEY = ['kyc', 'status'] as const;
+
+export function invalidateKycStatusCache(
+  queryClient: { invalidateQueries: (opts: { queryKey: readonly string[] }) => Promise<unknown> }
+) {
+  return queryClient.invalidateQueries({ queryKey: [...KYC_STATUS_QUERY_KEY] });
+}

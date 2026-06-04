@@ -37,20 +37,19 @@ export function validateFullName(name: string): string | undefined {
   return undefined;
 }
 
-export function validatePhoneNumber(
-  phone: string,
-  options?: { originalPhone?: string }
-): string | undefined {
+/** Format 10-digit Indian mobile for backend storage (+91...) */
+export function formatPhoneForBackend(digits: string): string {
+  const d = sanitizePhoneDigits(digits);
+  if (d.length === 10) return `+91${d}`;
+  if (d.startsWith('+')) return d;
+  return `+${d}`;
+}
+
+export function validatePhoneNumber(phone: string): string | undefined {
   const digits = sanitizePhoneDigits(phone);
   if (!digits) return 'Phone number is required';
   if (!INDIAN_MOBILE_REGEX.test(digits)) {
     return 'Enter a valid 10-digit mobile number starting with 6–9';
-  }
-  const original = options?.originalPhone
-    ? normalizePhoneDigits(options.originalPhone)
-    : '';
-  if (original && digits !== original) {
-    return 'Phone number can only be changed via OTP verification at login';
   }
   return undefined;
 }
@@ -76,9 +75,7 @@ export function validateProfileForm(input: ProfileFormInput): ProfileFieldErrors
   const nameErr = validateFullName(input.fullName);
   if (nameErr) errors.fullName = nameErr;
 
-  const phoneErr = validatePhoneNumber(input.phoneNumber, {
-    originalPhone: input.originalPhoneNumber,
-  });
+  const phoneErr = validatePhoneNumber(input.phoneNumber);
   if (phoneErr) errors.phoneNumber = phoneErr;
 
   const emailErr = validateEmail(input.email);

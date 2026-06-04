@@ -36,6 +36,11 @@ export function resolveUploadBackFallback(returnTo: string | string[] | undefine
 
 const LEGAL_RETURN_PATHS = new Set<string>(['/login', '/(tabs)/profile']);
 
+/** After saving payment details, return to Bank Details without stacking duplicate screens. */
+export function goToPaymentDetails(router: ExpoRouterLike): void {
+  goBackOrReplace(router, '/payment-details');
+}
+
 /** Back target for terms / privacy screens opened from login or profile. */
 export function resolveLegalBackFallback(
   returnTo: string | string[] | undefined,

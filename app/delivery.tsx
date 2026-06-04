@@ -1,8 +1,8 @@
-import { useLocalSearchParams } from 'expo-router';
-import DeliveryScreen from '../src/screens/DeliveryScreen';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-export default function Delivery() {
-  const params = useLocalSearchParams();
-  return <DeliveryScreen {...params} />;
+/** Legacy route — redirects to customer navigation screen. */
+export default function DeliveryRedirect() {
+  const params = useLocalSearchParams<{ orderId?: string }>();
+  const orderId = Array.isArray(params.orderId) ? params.orderId[0] : params.orderId;
+  return <Redirect href={{ pathname: '/customer-navigation', params: { orderId: orderId ?? '' } }} />;
 }
-

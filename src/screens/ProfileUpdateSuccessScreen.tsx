@@ -1,15 +1,14 @@
 /**
- * Profile Update Success Screen Component
- * Shows confirmation after successful profile update
+ * Profile Update Success Screen
  */
 
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
-import { Image, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import Text from '../components/common/Text';
 import CheckmarkLargeWhiteIcon from '../components/icons/CheckmarkLargeWhiteIcon';
-import UserIcon from '../components/icons/UserIcon';
+import ProfileScreenShell from '../components/layout/ProfileScreenShell';
 import profileSuccessStyles from '../styles/profileSuccessStyles';
 import { scale } from '../utils/responsive';
 
@@ -18,24 +17,24 @@ export default function ProfileUpdateSuccessScreen() {
   const params = useLocalSearchParams();
 
   const profile = {
-    fullName: params.fullName as string,
-    phoneNumber: params.phoneNumber as string,
-    email: params.email as string,
-    avatarUri: params.avatarUri as string,
+    fullName: (params.fullName as string) || '',
+    phoneNumber: (params.phoneNumber as string) || '',
+    email: (params.email as string) || '',
+    avatarUri: (params.avatarUri as string) || '',
   };
 
   const handleBackToProfile = useCallback(() => {
-    router.push('/profile' as any);
+    router.replace('/(tabs)/profile' as any);
   }, [router]);
 
   const handleEditAgain = useCallback(() => {
-    router.back();
+    router.replace('/edit-profile' as any);
   }, [router]);
 
-  // Get initials from name
   const getInitials = (name: string) => {
     return name
       .split(' ')
+      .filter(Boolean)
       .map((n) => n[0])
       .join('')
       .toUpperCase()
@@ -43,40 +42,42 @@ export default function ProfileUpdateSuccessScreen() {
   };
 
   return (
-    <SafeAreaView style={profileSuccessStyles.container} edges={['top', 'bottom']}>
-      <View style={profileSuccessStyles.content}>
-        {/* Success Icon */}
+    <ProfileScreenShell
+      title="Profile Update Success"
+      onBack={handleBackToProfile}
+      reserveSubtitleSpace
+    >
+      <ScrollView
+        style={profileSuccessStyles.scrollView}
+        contentContainerStyle={profileSuccessStyles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         <View style={profileSuccessStyles.successIconContainer}>
-          <CheckmarkLargeWhiteIcon size={scale(60)} color="#FFFFFF" />
+          <CheckmarkLargeWhiteIcon size={scale(56)} color="#FFFFFF" />
         </View>
 
-        {/* Title and Subtitle */}
         <View style={profileSuccessStyles.textContainer}>
-          <Text variant="h1" color="#101828" style={profileSuccessStyles.title}>
-            Profile Updated
-          </Text>
-          <Text variant="body" color="#6A7282" style={profileSuccessStyles.subtitle}>
+          <Text variant="bodySm" color="#6A7282" style={profileSuccessStyles.subtitle}>
             Your profile details have been saved successfully.
           </Text>
         </View>
 
-        {/* Profile Summary Card */}
         <View style={profileSuccessStyles.summaryCard}>
-          {/* Avatar */}
           {profile.avatarUri ? (
             <Image
               source={{ uri: profile.avatarUri }}
               style={profileSuccessStyles.avatar}
+              contentFit="cover"
             />
           ) : (
             <View style={profileSuccessStyles.avatarPlaceholder}>
               <Text variant="h2" style={profileSuccessStyles.initials}>
-                {getInitials(profile.fullName)}
+                {getInitials(profile.fullName) || 'R'}
               </Text>
             </View>
           )}
 
-          {/* Profile Info */}
           <View style={profileSuccessStyles.profileInfo}>
             <Text variant="h3" color="#101828" style={profileSuccessStyles.name}>
               {profile.fullName}
@@ -90,9 +91,7 @@ export default function ProfileUpdateSuccessScreen() {
           </View>
         </View>
 
-        {/* Buttons */}
         <View style={profileSuccessStyles.buttonContainer}>
-          {/* Primary Button */}
           <TouchableOpacity
             style={profileSuccessStyles.primaryButton}
             onPress={handleBackToProfile}
@@ -103,19 +102,17 @@ export default function ProfileUpdateSuccessScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Secondary Button */}
           <TouchableOpacity
             style={profileSuccessStyles.secondaryButton}
             onPress={handleEditAgain}
             activeOpacity={0.7}
           >
-            <Text variant="body" style={profileSuccessStyles.secondaryButtonText}>
+            <Text variant="bodySm" style={profileSuccessStyles.secondaryButtonText}>
               Edit Again
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+    </ProfileScreenShell>
   );
 }
-

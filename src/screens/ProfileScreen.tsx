@@ -8,7 +8,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProfileRow from '../components/ProfileRow';
 import Text from '../components/common/Text';
@@ -28,9 +28,11 @@ import Header from '../components/layout/Header';
 import { Theme } from '../constants/Theme';
 import { useUser } from '../contexts';
 import { deleteAccount } from '../api/auth';
-import { getRider } from '../api/rider';
+import { getRider, getRiderStats } from '../api/rider';
 import { getEarningsSummary } from '../api/payouts';
+import { useKycDocumentSummary } from '../hooks/useKycDocumentSummary';
 import profileStyles from '../styles/profileStyles';
+import { getProfileDocumentsStatusLabel } from '../utils/kycDocumentStatus';
 import { scale, verticalScale } from '../utils/responsive';
 
 export default function ProfileScreen() {
@@ -38,6 +40,40 @@ export default function ProfileScreen() {
   const { userData, logout: apiLogout } = useUser();
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+
+  const { counts, isLoading: kycSummaryLoading } = useKycDocumentSummary();
+
+  const documentsStatusBadge = useMemo(() => {
+    if (kycSummaryLoading && counts.total === 0) {
+      return <ActivityIndicator size="small" color={Theme.colors.primaryMedium} />;
+    }
+    const { label, variant } = getProfileDocumentsStatusLabel(counts);
+    if (variant === 'verified') {
+      return (
+        <View style={profileStyles.verifiedBadge}>
+          <Text variant="caption" style={profileStyles.verifiedText} numberOfLines={1}>
+            {label}
+          </Text>
+        </View>
+      );
+    }
+    if (variant === 'mixed') {
+      return (
+        <View style={profileStyles.documentsStatusBadgeMixed}>
+          <Text variant="caption" style={profileStyles.documentsStatusTextMixed} numberOfLines={1}>
+            {label}
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <View style={profileStyles.pendingBadge}>
+        <Text variant="caption" style={profileStyles.pendingText} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    );
+  }, [counts, kycSummaryLoading]);
 
   const { data: riderProfile } = useQuery({
     queryKey: ['rider', 'profile', userData.riderId],
@@ -53,27 +89,33 @@ export default function ProfileScreen() {
     staleTime: 60 * 1000,
   });
 
+  const { data: riderStats } = useQuery({
+    queryKey: ['rider', 'stats', userData.riderId],
+    queryFn: () => getRiderStats(userData.riderId!).then((r) => r.stats),
+    enabled: !!userData.riderId,
+    staleTime: 60 * 1000,
+  });
+
   const riderData = useMemo(() => {
     const rawName = riderProfile?.name ?? userData.name ?? 'Rider Name';
     const isPlaceholder = !rawName || rawName === 'Rider Name' || (rawName.startsWith('Rider ') && /^\d{4}$/.test(rawName.substring(6)));
     
-    // Force re-parse
     return {
       name: isPlaceholder ? '-' : rawName,
-      riderId: userData.riderId ?? riderProfile?.riderId ?? 'RDR2024001',
-    rating: 4.8,
-    deliveries: lifetimeSummary?.orderCount ?? 0,
-    phone: riderProfile?.phoneNumber ?? userData.phoneNumber ?? '+91 9889899888',
-    email: riderProfile?.email ?? userData.email ?? 'rider@quickrider.com',
-    floatingCash: riderProfile?.earnings?.pendingAmount ?? 0,
+      riderId: userData.riderId ?? riderProfile?.riderId ?? '—',
+      rating: riderStats?.stats?.averageRating ?? riderProfile?.stats?.averageRating ?? 0,
+      deliveries: lifetimeSummary?.orderCount ?? riderStats?.stats?.completedDeliveries ?? 0,
+      phone: riderProfile?.phoneNumber ?? userData.phoneNumber ?? '—',
+      email: riderProfile?.email ?? userData.email ?? '—',
+      floatingCash: riderStats?.floatingCash ?? riderProfile?.earnings?.pendingAmount ?? 0,
       stats: {
-        acceptanceRate: '98.5%',
-        onTimeDelivery: '99.2%',
+        acceptanceRate: riderStats?.stats?.acceptanceRate ?? '—',
+        onTimeDelivery: riderStats?.stats?.onTimeDelivery ?? '—',
         totalOnlineTime: lifetimeSummary?.onlineTime ?? '0h',
-        lifetimeEarnings: `₹${lifetimeSummary?.totalEarnings ?? 0}`,
+        lifetimeEarnings: `₹${lifetimeSummary?.totalEarnings ?? riderStats?.lifetimeEarnings ?? 0}`,
       },
     };
-  }, [riderProfile, userData.name, userData.riderId, userData.phoneNumber, userData.email, lifetimeSummary]);
+  }, [riderProfile, riderStats, userData, lifetimeSummary]);
 
   const handleEditProfile = useCallback(() => {
     console.log('Edit Profile');
@@ -252,21 +294,7 @@ export default function ProfileScreen() {
             icon={<DocumentIcon size={scale(18)} color="#6A7282" />}
             label="My Documents"
             onPress={handleMyDocuments}
-            rightBadge={
-              riderProfile?.status === 'approved' || riderProfile?.status === 'active' ? (
-                <View style={profileStyles.verifiedBadge}>
-                  <Text variant="caption" style={profileStyles.verifiedText}>
-                    Verified
-                  </Text>
-                </View>
-              ) : (
-                <View style={profileStyles.pendingBadge}>
-                  <Text variant="caption" style={profileStyles.pendingText}>
-                    Pending
-                  </Text>
-                </View>
-              )
-            }
+            rightBadge={documentsStatusBadge}
           />
 
           <ProfileRow

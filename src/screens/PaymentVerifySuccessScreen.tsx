@@ -4,12 +4,14 @@
  */
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
+import { BackHandler, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Text from '../components/common/Text';
 import CheckmarkLargeWhiteIcon from '../components/icons/CheckmarkLargeWhiteIcon';
+import Header from '../components/layout/Header';
 import paymentSuccessStyles from '../styles/paymentSuccessStyles';
+import { goToPaymentDetails } from '../utils/navigation/safeBack';
 import { scale } from '../utils/responsive';
 
 export default function PaymentVerifySuccessScreen() {
@@ -21,21 +23,29 @@ export default function PaymentVerifySuccessScreen() {
   const detail = params.detail as string;
 
   const handleBackToPaymentDetails = useCallback(() => {
-    router.push('/payment-details' as any);
+    goToPaymentDetails(router);
   }, [router]);
 
   const handleChangeAgain = useCallback(() => {
-    router.push({
+    router.replace({
       pathname: '/update-payment-details',
       params: { initialTab: method },
     } as any);
   }, [router, method]);
 
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBackToPaymentDetails();
+      return true;
+    });
+    return () => sub.remove();
+  }, [handleBackToPaymentDetails]);
+
   const getSubtitle = () => {
     if (method === 'bank') {
-      return 'Your bank account has been verified and set as your primary payout method.';
+      return 'Your bank account has been saved. You can use bank and UPI together for payouts.';
     }
-    return 'Your UPI ID has been verified and set as your primary payout method.';
+    return 'Your UPI ID has been saved. You can use bank and UPI together for payouts.';
   };
 
   const maskAccountNumber = (accountNumber: string) => {
@@ -46,6 +56,7 @@ export default function PaymentVerifySuccessScreen() {
 
   return (
     <SafeAreaView style={paymentSuccessStyles.container} edges={['top', 'bottom']}>
+      <Header title="Payment Updated" onBack={handleBackToPaymentDetails} />
       <View style={paymentSuccessStyles.content}>
         {/* Success Icon */}
         <View style={paymentSuccessStyles.successIconContainer}>

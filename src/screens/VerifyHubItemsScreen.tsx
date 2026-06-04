@@ -1,12 +1,11 @@
 /**
  * Verify Hub Items Screen Component
  * Screen for verifying and checking off items collected from dispatch bay
- * Matches Figma design exactly
  */
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   Animated,
@@ -22,8 +21,10 @@ import Header from '../components/layout/Header';
 import { Theme } from '../constants/Theme';
 import verifyHubItemsStyles from '../styles/verifyHubItemsStyles';
 import { scale } from '../utils/responsive';
-import { getOrder } from '../api/orders';
+import { pickOrder } from '../api/orders';
 import { useConfigWithDefaults } from '../contexts';
+import { useActiveOrder, invalidateActiveOrder } from '../hooks/useActiveOrder';
+import { getPickupLabel } from '../utils/fleetMapCoords';
 
 interface HubItem {
   id: string;
@@ -32,46 +33,34 @@ interface HubItem {
   selected: boolean;
 }
 
-const FALLBACK_ITEMS: HubItem[] = [
-  { id: '1', name: 'Amul Milk 1L', quantity: 2, selected: false },
-  { id: '2', name: 'Bread - White', quantity: 1, selected: false },
-  { id: '3', name: 'Eggs - 6pcs', quantity: 1, selected: false },
-  { id: '4', name: 'Tomatoes 500g', quantity: 1, selected: false },
-  { id: '5', name: 'Onions 1kg', quantity: 1, selected: false },
-  { id: '6', name: 'Rice 5kg', quantity: 1, selected: false },
-  { id: '7', name: 'Cooking Oil 1L', quantity: 1, selected: false },
-  { id: '8', name: 'Sugar 1kg', quantity: 1, selected: false },
-];
-
 export default function VerifyHubItemsScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const params = useLocalSearchParams();
   const config = useConfigWithDefaults();
   const orderId = Array.isArray(params.orderId) ? params.orderId[0] : params.orderId;
 
-  const { data: orderRes } = useQuery({
-    queryKey: ['order', orderId],
-    queryFn: () => getOrder(orderId!),
-    enabled: !!orderId,
-  });
+  const { order, isLoading, isError, error } = useActiveOrder(orderId);
 
   const orderItems = useMemo(() => {
-    const list = orderRes?.order?.items;
-    if (!list?.length) return FALLBACK_ITEMS;
+    const list = order?.items;
+    if (!list?.length) return [] as HubItem[];
     return list.map((it, i) => ({
-      id: (it as any)._id || `${it.skuId || 'item'}-${i}`,
-      name: it.productName || `Item ${i + 1}`,
+      id: (it as { _id?: string })._id || `${it.skuId || 'item'}-${i}`,
+      name: it.productName || it.skuId || '',
       quantity: it.quantity || 1,
       selected: false,
     }));
-  }, [orderRes?.order?.items]);
+  }, [order?.items]);
 
   const pickupBay =
-    Array.isArray(params.pickupBay) ? params.pickupBay[0] : params.pickupBay
-    || ((orderRes?.order?.darkstoreCode || orderRes?.order?.warehouseCode) ? `Darkstore ${orderRes.order.darkstoreCode || orderRes.order.warehouseCode}` : config.defaultHubName);
+    (Array.isArray(params.pickupBay) ? params.pickupBay[0] : params.pickupBay) ||
+    getPickupLabel(order) ||
+    config.defaultHubName;
 
-  const [items, setItems] = useState<HubItem[]>(orderItems);
+  const [items, setItems] = useState<HubItem[]>([]);
   const [progressAnim] = useState(new Animated.Value(0));
+  const [submitting, setSubmitting] = useState(false);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -90,7 +79,6 @@ export default function VerifyHubItemsScreen() {
   const remaining = totalItems - selectedCount;
   const progress = totalItems > 0 ? selectedCount / totalItems : 0;
 
-  // Animate progress bar
   useEffect(() => {
     Animated.timing(progressAnim, {
       toValue: progress,
@@ -101,11 +89,7 @@ export default function VerifyHubItemsScreen() {
 
   const handleBack = useCallback(() => {
     if (!isMountedRef.current) return;
-    try {
-      router.back();
-    } catch (error) {
-      console.error('Error handling back press:', error);
-    }
+    router.back();
   }, [router]);
 
   const toggleItem = useCallback((itemId: string) => {
@@ -117,30 +101,22 @@ export default function VerifyHubItemsScreen() {
     );
   }, []);
 
-  const handleBottomButtonPress = useCallback(() => {
-    if (!isMountedRef.current) return;
-    if (remaining === 0) {
-      try {
-        const order = orderRes?.order;
-        const addr = order?.delivery?.address;
-        const deliveryLine = addr
-          ? [addr.addressLine1, addr.addressLine2, addr.city, addr.pincode].filter(Boolean).join(', ')
-          : 'Delivery address';
-        router.push({
-          pathname: '/delivery',
-          params: {
-            orderId: orderId || order?._id || '',
-            customerName: order?.customerPhoneNumber || 'Customer',
-            customerAddress: deliveryLine,
-            estimatedPayout: String(order?.estimatedPayout ?? 0),
-            items: String(items.length),
-          },
-        });
-      } catch (error) {
-        console.error('Error navigating after verification:', error);
-      }
+  const handleBottomButtonPress = useCallback(async () => {
+    if (!isMountedRef.current || remaining > 0 || submitting) return;
+    const oid = orderId || order?._id;
+    if (!oid) return;
+
+    setSubmitting(true);
+    try {
+      await pickOrder(oid);
+      invalidateActiveOrder(queryClient, oid);
+      router.push({ pathname: '/delivery', params: { orderId: oid } });
+    } catch (err) {
+      console.error('Error after hub verification:', err);
+    } finally {
+      if (isMountedRef.current) setSubmitting(false);
     }
-  }, [remaining, router, params, orderId, orderRes?.order, items.length]);
+  }, [remaining, submitting, router, orderId, order, queryClient]);
 
   const progressBarWidth = progressAnim.interpolate({
     inputRange: [0, 1],
@@ -154,24 +130,17 @@ export default function VerifyHubItemsScreen() {
       onPress={() => toggleItem(item.id)}
       activeOpacity={0.7}
     >
-      {/* Checkbox */}
       <View
         style={[
           verifyHubItemsStyles.checkbox,
           item.selected && verifyHubItemsStyles.checkboxChecked,
         ]}
       >
-        {item.selected && (
-          <CheckIcon size={scale(24)} color={Theme.colors.white} />
-        )}
+        {item.selected && <CheckIcon size={scale(24)} color={Theme.colors.white} />}
       </View>
-
-      {/* Item Name */}
       <Text variant="bodySm" color="#364153" style={verifyHubItemsStyles.itemName}>
         {item.name}
       </Text>
-
-      {/* Quantity Pill */}
       <View style={verifyHubItemsStyles.quantityPill}>
         <Text variant="caption" color="#4A5565" style={verifyHubItemsStyles.quantityText}>
           x{item.quantity}
@@ -182,61 +151,63 @@ export default function VerifyHubItemsScreen() {
 
   return (
     <SafeAreaView style={verifyHubItemsStyles.container} edges={['top', 'bottom']}>
-      {/* Header */}
       <View style={verifyHubItemsStyles.header}>
-        <Header
-          title="Verify Hub Items"
-          subtitle={`Collect from ${pickupBay}`}
-          onBack={handleBack}
-        />
-        
-        {/* Progress Bar */}
+        <Header title="Verify Hub Items" subtitle={`Collect from ${pickupBay}`} onBack={handleBack} />
         <View style={verifyHubItemsStyles.progressContainer}>
           <View style={verifyHubItemsStyles.progressBarContainer}>
-            <Animated.View
-              style={[
-                verifyHubItemsStyles.progressBarFill,
-                { width: progressBarWidth },
-              ]}
-            />
+            <Animated.View style={[verifyHubItemsStyles.progressBarFill, { width: progressBarWidth }]} />
           </View>
           <Text variant="bodySm" color="#6A7282" style={verifyHubItemsStyles.progressText}>
-            {selectedCount}/{items.length}
+            {selectedCount}/{Math.max(items.length, 1)}
           </Text>
         </View>
       </View>
 
-      {/* Items List */}
       <ScrollView
         style={verifyHubItemsStyles.content}
-        contentContainerStyle={{ gap: scale(10.5) }}
+        contentContainerStyle={{ gap: scale(10.5), flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
-        {items.map(renderItemRow)}
+        {isLoading ? (
+          <View style={{ paddingVertical: scale(40), alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={Theme.colors.primaryMedium} />
+            <Text variant="caption" color={Theme.colors.textGrey} style={{ marginTop: scale(8) }}>
+              Loading order items…
+            </Text>
+          </View>
+        ) : isError ? (
+          <View style={{ paddingVertical: scale(24), alignItems: 'center' }}>
+            <Text variant="bodySm" color={Theme.colors.textGrey}>
+              {error instanceof Error ? error.message : 'Failed to load order'}
+            </Text>
+          </View>
+        ) : items.length === 0 ? (
+          <View style={{ paddingVertical: scale(24), alignItems: 'center' }}>
+            <Text variant="bodySm" color={Theme.colors.textGrey}>
+              No items found for this order.
+            </Text>
+          </View>
+        ) : (
+          items.map(renderItemRow)
+        )}
       </ScrollView>
 
-      {/* Bottom Button */}
       <View style={verifyHubItemsStyles.bottomButtonContainer}>
         <TouchableOpacity
           style={[
             verifyHubItemsStyles.bottomButton,
-            remaining > 0 && verifyHubItemsStyles.bottomButtonDisabled,
+            (remaining > 0 || submitting) && verifyHubItemsStyles.bottomButtonDisabled,
           ]}
           onPress={handleBottomButtonPress}
-          activeOpacity={remaining === 0 ? 0.8 : 1}
-          disabled={remaining > 0}
+          activeOpacity={remaining === 0 && !submitting ? 0.8 : 1}
+          disabled={remaining > 0 || submitting || items.length === 0}
         >
-          {/* Left Circle */}
           <View style={verifyHubItemsStyles.bottomButtonLeftCircle}>
             <RightArrowIcon size={scale(17.5)} color={Theme.colors.white} />
           </View>
-
-          {/* Center Text */}
           <Text variant="body" color={Theme.colors.white} style={verifyHubItemsStyles.bottomButtonText}>
-            {remaining > 0 ? `Pick ${remaining} More Items` : 'Proceed'}
+            {submitting ? 'Saving…' : remaining > 0 ? `Pick ${remaining} More Items` : 'Proceed to Delivery'}
           </Text>
-
-          {/* Right Icon Circle */}
           <View style={verifyHubItemsStyles.bottomButtonRightIcon}>
             <RightArrowIcon size={scale(21)} color="#32C96A" />
           </View>
@@ -245,4 +216,3 @@ export default function VerifyHubItemsScreen() {
     </SafeAreaView>
   );
 }
-

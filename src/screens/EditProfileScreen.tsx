@@ -16,15 +16,16 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import LabeledInput from '../components/common/LabeledInput';
 import Text from '../components/common/Text';
 import CheckmarkSmallIcon from '../components/icons/CheckmarkSmallIcon';
 import EmailIcon from '../components/icons/EmailIcon';
 import PhoneIcon from '../components/icons/PhoneIcon';
 import UserIcon from '../components/icons/UserIcon';
-import Header from '../components/layout/Header';
+import ProfileScreenShell from '../components/layout/ProfileScreenShell';
 import { useUser } from '../contexts';
+import { getMe, uploadProfilePhoto } from '../api/auth';
 import { updateRider } from '../api/rider';
 import editProfileStyles from '../styles/editProfileStyles';
 import { Profile } from '../types/profile';
@@ -34,11 +35,13 @@ import {
   ProfileFieldErrors,
   sanitizePhoneDigits,
   validateProfileForm,
+  formatPhoneForBackend,
 } from '../utils/profileValidation';
 import { scale } from '../utils/responsive';
 
 export default function EditProfileScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { userData, updateUserData } = useUser();
 
   const resolveDisplayName = (name: string) => {
@@ -170,31 +173,84 @@ export default function EditProfileScreen() {
     if (!hasChanges()) return;
     if (!validate()) return;
 
-    setIsSaving(true);
     const riderId = userData.riderId;
+    if (!riderId) {
+      setSubmitError('You must be logged in to save profile changes.');
+      return;
+    }
+
+    setIsSaving(true);
     const trimmedName = profile.fullName.trim();
     const trimmedEmail = profile.email.trim().toLowerCase();
-    const displayPhone = storedPhoneDigits || profile.phoneNumber;
+    const phoneDigits = normalizePhoneDigits(profile.phoneNumber);
+    const phoneChanged = phoneDigits !== storedPhoneDigits;
 
     try {
-      if (riderId) {
-        await updateRider(riderId, { name: trimmedName, email: trimmedEmail });
+      let profilePictureUrl = userData.profilePhotoUri;
+      const avatarChanged =
+        profile.avatarUri !== (userData.profilePhotoUri || null);
+      const isLocalPhoto =
+        profile.avatarUri &&
+        !profile.avatarUri.startsWith('http://') &&
+        !profile.avatarUri.startsWith('https://');
+
+      if (avatarChanged && isLocalPhoto && profile.avatarUri) {
+        const photoRes = await uploadProfilePhoto(profile.avatarUri);
+        profilePictureUrl = photoRes.profilePicture;
+      } else if (avatarChanged && profile.avatarUri) {
+        profilePictureUrl = profile.avatarUri;
       }
-      updateUserData({
+
+      const payload: {
+        name?: string;
+        email?: string;
+        phoneNumber?: string;
+      } = {
         name: trimmedName,
-        phoneNumber: displayPhone,
         email: trimmedEmail,
-        profilePhotoUri: profile.avatarUri || null,
+      };
+      if (phoneChanged) {
+        payload.phoneNumber = formatPhoneForBackend(phoneDigits);
+      }
+
+      const res = await updateRider(riderId, payload);
+      const rider = res.rider;
+
+      const displayPhone = normalizePhoneDigits(rider.phoneNumber || phoneDigits);
+      const savedPhoto = rider.profilePicture ?? profilePictureUrl ?? null;
+
+      updateUserData({
+        name: rider.name ?? trimmedName,
+        phoneNumber: displayPhone,
+        email: rider.email ?? trimmedEmail,
+        profilePhotoUri: savedPhoto,
       });
+
+      queryClient.setQueryData(['rider', 'profile', riderId], rider);
+
       router.push({
         pathname: '/profile-update-success',
         params: {
-          fullName: trimmedName,
+          fullName: rider.name ?? trimmedName,
           phoneNumber: displayPhone,
-          email: trimmedEmail,
-          avatarUri: profile.avatarUri || '',
+          email: rider.email ?? trimmedEmail,
+          avatarUri: savedPhoto || '',
         },
       } as any);
+
+      void queryClient.invalidateQueries({ queryKey: ['rider', 'profile', riderId] });
+      void getMe()
+        .then((me) => {
+          if (me.profile) {
+            updateUserData({
+              name: me.profile.name ?? trimmedName,
+              phoneNumber: normalizePhoneDigits(me.profile.phoneNumber || displayPhone),
+              email: me.profile.email ?? trimmedEmail,
+              profilePhotoUri: me.profile.profilePicture ?? savedPhoto,
+            });
+          }
+        })
+        .catch(() => {});
     } catch (e) {
       const apiFields = parseProfileValidationFromApi(
         (e as Error & { apiBody?: unknown })?.apiBody
@@ -214,21 +270,21 @@ export default function EditProfileScreen() {
     hasChanges,
     profile,
     router,
+    queryClient,
     storedPhoneDigits,
     updateUserData,
     userData.riderId,
+    userData.profilePhotoUri,
   ]);
 
   const isButtonDisabled = !hasChanges() || isSaving;
 
   return (
-    <SafeAreaView style={editProfileStyles.container} edges={['top', 'bottom']}>
-      {/* Header */}
-      <Header
-        title="Edit Profile"
-        subtitle="Update your profile information"
-        onBack={() => router.back()}
-      />
+    <ProfileScreenShell
+      title="Edit Profile"
+      subtitle="Update your profile information"
+      onBack={() => router.back()}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={editProfileStyles.keyboardView}
@@ -363,7 +419,7 @@ export default function EditProfileScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ProfileScreenShell>
   );
 }
 

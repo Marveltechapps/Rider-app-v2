@@ -107,18 +107,49 @@ const documentsStyles = StyleSheet.create({
     lineHeight: scale(21),
     color: '#FFFFFF',
   },
+  statusCardHeadline: {
+    fontSize: scale(16),
+    fontWeight: '700',
+    lineHeight: scale(22),
+    color: '#FFFFFF',
+  },
+  statusSummaryGrid: {
+    alignSelf: 'stretch',
+    gap: verticalScale(6),
+    marginTop: verticalScale(4),
+  },
+  statusSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusSummaryLabel: {
+    fontSize: scale(12),
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  statusSummaryValue: {
+    fontSize: scale(14),
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
   progressBarContainer: {
     alignSelf: 'stretch',
-    height: scale(5.25),
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    height: scale(8),
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: scale(100),
     overflow: 'hidden',
-    paddingRight: scale(124),
+    marginTop: verticalScale(8),
   },
   progressBarFill: {
-    height: scale(5.25),
+    height: scale(8),
     backgroundColor: '#FFFFFF',
     borderRadius: scale(100),
+    minWidth: 0,
+  },
+  progressPercentLabel: {
+    fontSize: scale(12),
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: verticalScale(4),
   },
 
   // Document list section
@@ -226,15 +257,24 @@ const documentsStyles = StyleSheet.create({
   },
   statusBadgeVerified: {
     backgroundColor: 'rgba(50, 201, 106, 0.1)',
-    width: scale(71.66),
+    minWidth: scale(72),
   },
   statusBadgePending: {
     backgroundColor: '#FFF7ED',
-    width: scale(73.77),
+    minWidth: scale(72),
   },
   statusBadgeExpired: {
     backgroundColor: '#FEF2F2',
-    width: scale(70.45),
+    minWidth: scale(72),
+  },
+  statusBadgeUnderReview: {
+    backgroundColor: 'rgba(21, 93, 252, 0.1)',
+    minWidth: scale(88),
+    paddingHorizontal: scale(8),
+  },
+  statusBadgeRejected: {
+    backgroundColor: '#FEF2F2',
+    minWidth: scale(72),
   },
   statusBadgeIcon: {
     width: scale(10.5),
@@ -254,6 +294,12 @@ const documentsStyles = StyleSheet.create({
     color: '#FF6900',
   },
   statusTextExpired: {
+    color: '#FB2C36',
+  },
+  statusTextUnderReview: {
+    color: '#155DFC',
+  },
+  statusTextRejected: {
     color: '#FB2C36',
   },
 
