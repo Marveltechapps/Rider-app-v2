@@ -13,7 +13,7 @@ interface DocumentAadharIconProps {
 
 export default function DocumentAadharIcon({
   size = 42,
-  color = '#32C96A',
+  color = '#237227',
 }: DocumentAadharIconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 42 42" fill="none">

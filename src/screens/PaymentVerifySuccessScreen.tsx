@@ -76,7 +76,7 @@ export default function PaymentVerifySuccessScreen() {
         {/* Summary Card */}
         <View style={paymentSuccessStyles.summaryCard}>
           <View style={paymentSuccessStyles.summaryBadge}>
-            <Text variant="caption" color="#32C96A" style={paymentSuccessStyles.summaryBadgeText}>
+            <Text variant="caption" color="#237227" style={paymentSuccessStyles.summaryBadgeText}>
               Primary Method
             </Text>
           </View>

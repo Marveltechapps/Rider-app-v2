@@ -66,7 +66,7 @@ const acceptedOrderStyles = StyleSheet.create({
     width: scale(76.12),
     height: scale(76.12),
     borderRadius: scale(38.06),
-    backgroundColor: 'rgba(50, 201, 106, 0.2)',
+    backgroundColor: 'rgba(35, 114, 39, 0.2)',
     opacity: 0.91,
   },
   riderMarkerLabel: {
@@ -160,7 +160,7 @@ const acceptedOrderStyles = StyleSheet.create({
   hubIconContainer: {
     width: scale(49),
     height: scale(49),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderRadius: scale(14),
     justifyContent: 'center',
     alignItems: 'center',
@@ -190,7 +190,7 @@ const acceptedOrderStyles = StyleSheet.create({
     gap: scale(8),
     paddingVertical: scale(0),
     paddingHorizontal: scale(12), // Fixed: 10.5 → 12 (8px spacing system)
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderRadius: scale(9999),
     alignSelf: 'flex-start',
     height: scale(28),

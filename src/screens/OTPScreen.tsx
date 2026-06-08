@@ -1,116 +1,327 @@
 /**
- * OTP Verification Screen Component
- * Mobile OTP verification screen matching Figma design
- * 
- * @component
- * @example
- * <OTPScreen phoneNumber="+91 98765 43210" />
+ * OTP Verification Screen — 4-digit OTP with Mobile / Email / WhatsApp session support
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
+  Text,
   StyleSheet,
-  ScrollView,
-  Dimensions,
-  TouchableOpacity,
   TextInput,
-  ActivityIndicator,
-  Alert,
+  KeyboardAvoidingView,
   Keyboard,
-  TouchableWithoutFeedback,
+  Pressable,
+  Platform,
+  useWindowDimensions,
+  ScrollView,
+  TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Theme } from '../constants/Theme';
-import { scale, verticalScale } from '../utils/responsive';
-import AppLogo from '../components/common/AppLogo';
-import Text from '../components/common/Text';
-import Button from '../components/common/Button';
-import BackIcon from '../components/icons/BackIcon';
-import ArrowRightIcon from '../components/icons/ArrowRightIcon';
-import { useUser } from '../contexts';
-import { requestOtp, verifyOtp, resendOtp, type OnboardingStateResponse } from '../api/auth';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import AuthHeader from '@/components/auth/AuthHeader';
+import Button from '@/components/common/Button';
+import { useAuthScreenTheme } from '@/hooks/useAuthScreenTheme';
+import { AuthLayout } from '@/constants/authTheme';
+import {
+  getChannelLabel,
+  resendLoginOtp,
+  verifyLoginOtp,
+  type LoginMode,
+  type OtpTarget,
+} from '@/services/auth.service';
+import {
+  clearPendingOtpSession,
+  getMemoryPendingOtpSession,
+  loadPendingOtpSession,
+  type PendingOtpSession,
+} from '@/utils/pendingOtpSession';
+import { isSyntheticRiderPhone, resolveLoginContact } from '@/utils/loginContact';
+import { useUser } from '@/contexts';
+import type { OnboardingStateResponse } from '@/api/auth';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const RESEND_COOLDOWN_SEC = AuthLayout.resendCooldownSec;
 
-interface OTPScreenProps {
-  phoneNumber?: string;
+const ONBOARDING_STEP_ROUTES: Record<string, string> = {
+  profile: '/personal-details',
+  location: '/search-location',
+  vehicle: '/vehicle-details',
+  'profile-photo': '/profile-photo',
+  documents: '/kyc-upload',
+  training: '/training-kit',
+  kit: '/training-kit',
+  complete: '/(tabs)',
+};
+
+function resolvePostVerifyRoute(
+  onboardingComplete: boolean,
+  onboardingStep?: OnboardingStateResponse['currentStep']
+): string {
+  if (onboardingComplete) return '/(tabs)';
+  if (onboardingStep && ONBOARDING_STEP_ROUTES[onboardingStep]) {
+    return ONBOARDING_STEP_ROUTES[onboardingStep];
+  }
+  return '/search-location';
 }
 
-export default function OTPScreen({ phoneNumber = '+91 98765 43210' }: OTPScreenProps) {
+function resolveRouteParam(value: string | string[] | undefined): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value[0]) return value[0];
+  return '';
+}
+
+function mergeOtpSession(
+  params: {
+    loginMode?: string | string[];
+    otpTarget?: string | string[];
+    countryCode?: string | string[];
+    phone?: string | string[];
+    phoneNumber?: string | string[];
+    email?: string | string[];
+    channel?: string | string[];
+    displayTarget?: string | string[];
+  },
+  saved?: PendingOtpSession | null
+): PendingOtpSession {
+  const routeEmail = resolveRouteParam(params.email);
+  const routePhone = resolveRouteParam(params.phone) || resolveRouteParam(params.phoneNumber);
+  const routeLoginMode = (resolveRouteParam(params.loginMode) as LoginMode) || saved?.loginMode || 'mobile';
+  const routeOtpTarget =
+    (resolveRouteParam(params.otpTarget) as OtpTarget) ||
+    saved?.otpTarget ||
+    (routeLoginMode === 'email' ? 'email' : 'phone');
+
+  return {
+    loginMode: routeLoginMode,
+    otpTarget: routeOtpTarget,
+    countryCode: resolveRouteParam(params.countryCode) || saved?.countryCode || '+91',
+    phone: routePhone || saved?.phone || '',
+    email: routeEmail || saved?.email || '',
+    channel: resolveRouteParam(params.channel) || saved?.channel || 'sms',
+    displayTarget:
+      resolveRouteParam(params.displayTarget) ||
+      saved?.displayTarget ||
+      (routeOtpTarget === 'email' ? routeEmail || saved?.email || '' : routePhone || saved?.phone || ''),
+  };
+}
+
+export default function OTPScreen() {
   const router = useRouter();
-  const { updateUserData, setAuthFromVerify } = useUser();
-  const OTP_LENGTH = 4; // Signin API sends 4-digit OTP via SMS
-  const [otp, setOtp] = useState<string[]>(() => Array(OTP_LENGTH).fill(''));
-  const [timer, setTimer] = useState(30);
-  const [canResend, setCanResend] = useState(false);
-  const [focusedIndex, setFocusedIndex] = useState<number | null>(0);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [verifying, setVerifying] = useState(false);
+  const theme = useAuthScreenTheme();
+  const params = useLocalSearchParams<{
+    loginMode?: string | string[];
+    otpTarget?: string | string[];
+    countryCode?: string | string[];
+    phone?: string | string[];
+    email?: string | string[];
+    channel?: string | string[];
+    displayTarget?: string | string[];
+    phoneNumber?: string | string[];
+  }>();
+  const { setAuthFromVerify } = useUser();
+  const { width: screenWidth } = useWindowDimensions();
+
+  const [otpSession, setOtpSession] = useState<PendingOtpSession | null>(() =>
+    mergeOtpSession(params, getMemoryPendingOtpSession())
+  );
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const saved = await loadPendingOtpSession();
+      const merged = mergeOtpSession(params, saved);
+      if (active) setOtpSession(merged);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [
+    params.loginMode,
+    params.otpTarget,
+    params.countryCode,
+    params.phone,
+    params.phoneNumber,
+    params.email,
+    params.channel,
+    params.displayTarget,
+  ]);
+
+  const loginMode = otpSession?.loginMode ?? 'mobile';
+  const otpTarget = otpSession?.otpTarget ?? 'phone';
+  const countryCode = otpSession?.countryCode ?? '+91';
+  const phone = otpSession?.phone ?? '';
+  const email = otpSession?.email ?? '';
+  const channel = otpSession?.channel ?? 'sms';
+  const displayTarget = otpSession?.displayTarget ?? (otpTarget === 'email' ? email : phone);
+
+  const [otp, setOtp] = useState<string[]>(['', '', '', '']);
+  const [loading, setLoading] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(RESEND_COOLDOWN_SEC);
   const [otpError, setOtpError] = useState<string | null>(null);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const isVerifyingRef = useRef(false);
+  const isResendingRef = useRef(false);
+  const hasVerifiedSuccessfullyRef = useRef(false);
 
-  // Add small delay to verifyOtp to ensure state updates and storage settle
-  const verifyWithStateSync = async (otpValue: string) => {
-    try {
-      await handleVerifyOtp(otpValue);
-    } catch (err) {
-      // Error handled in handleVerifyOtp
-    }
-  };
-
-  // Auto-focus first input on mount
-  useEffect(() => {
-    const t = setTimeout(() => {
-      inputRefs.current[0]?.focus();
-    }, 100);
-    return () => clearTimeout(t);
+  const dismissKeyboard = React.useCallback(() => {
+    inputRefs.current.forEach((ref) => ref?.blur());
+    Keyboard.dismiss();
   }, []);
 
-  // Timer countdown
-  useEffect(() => {
-    if (timer > 0 && !canResend) {
-      const interval = setInterval(() => {
-        setTimer((prev) => {
-          if (prev <= 1) {
-            setCanResend(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [timer, canResend]);
+  React.useEffect(() => {
+    dismissKeyboard();
+  }, [dismissKeyboard]);
 
-  const handleOtpChange = (value: string, index: number) => {
-    if (value.length > 1) {
-      const pastedOtp = value.slice(0, OTP_LENGTH).split('');
+  const contentWidth = useMemo(
+    () => Math.min(Math.max(screenWidth - 32, 320), 420),
+    [screenWidth]
+  );
+
+  const channelLabel = getChannelLabel(channel, loginMode);
+  const deliveryHint =
+    loginMode === 'whatsapp' && channel.toLowerCase().includes('sms')
+      ? ' (WhatsApp unavailable — sent via SMS)'
+      : '';
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: theme.colors.pageBg,
+        },
+        scroll: { flex: 1 },
+        scrollContent: {
+          flexGrow: 1,
+          paddingHorizontal: theme.layout.contentPaddingH,
+          paddingBottom: theme.spacing['2xl'],
+        },
+        content: {
+          paddingTop: theme.spacing['2xl'],
+        },
+        otpCard: {
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radius.xl,
+          padding: theme.spacing.lg,
+          borderWidth: 1,
+          borderColor: theme.colors.primaryMuted,
+        },
+        title: {
+          fontSize: theme.typography.fontSize['2xl'],
+          fontWeight: theme.typography.fontWeight.bold,
+          color: theme.colors.textPrimary,
+          textAlign: 'center',
+          marginBottom: theme.spacing.sm,
+        },
+        subtitle: {
+          fontSize: theme.typography.fontSize.md,
+          lineHeight: 21,
+          color: theme.colors.mutedText,
+          textAlign: 'center',
+          marginBottom: theme.spacing['2xl'],
+        },
+        target: {
+          fontWeight: theme.typography.fontWeight.bold,
+          color: theme.colors.primary,
+        },
+        otpContainer: {
+          flexDirection: 'row',
+          justifyContent: 'center',
+          gap: theme.layout.otpGap,
+          marginBottom: theme.spacing.lg,
+        },
+        otpInput: {
+          width: theme.layout.otpBoxWidth,
+          height: theme.layout.otpBoxHeight,
+          backgroundColor: theme.colors.inputBg,
+          borderRadius: theme.radius.lg,
+          borderWidth: 1,
+          borderColor: theme.colors.inputBorder,
+          fontSize: theme.typography.fontSize['3xl'],
+          fontWeight: theme.typography.fontWeight.bold,
+          color: theme.colors.textPrimary,
+          textAlign: 'center',
+        },
+        otpInputFilled: {
+          borderColor: theme.colors.inputFocus,
+          borderWidth: 2,
+          backgroundColor: theme.colors.primaryLight,
+        },
+        errorText: {
+          textAlign: 'center',
+          fontSize: theme.typography.fontSize.sm,
+          color: theme.colors.inputBorderError,
+          marginBottom: theme.spacing.md,
+        },
+        resendSection: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          marginBottom: theme.spacing['2xl'],
+          marginTop: theme.spacing.sm,
+          minHeight: 24,
+        },
+        resendActionsRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: theme.spacing.lg,
+        },
+        resendTimer: {
+          fontSize: theme.typography.fontSize.md,
+          color: theme.colors.resendText,
+          textAlign: 'center',
+        },
+        resendLink: {
+          fontSize: theme.typography.fontSize.md,
+          fontWeight: theme.typography.fontWeight.bold,
+          color: theme.colors.primary,
+          textDecorationLine: 'underline',
+        },
+        changeContact: {
+          fontSize: theme.typography.fontSize.md,
+          color: theme.colors.primary,
+          fontWeight: theme.typography.fontWeight.semibold,
+          textDecorationLine: 'underline',
+        },
+      }),
+    [theme]
+  );
+
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const id = setInterval(() => {
+      setResendCountdown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resendCountdown]);
+
+  const handleOtpChange = (text: string, index: number) => {
+    const numeric = text.replace(/[^0-9]/g, '');
+    setOtpError(null);
+
+    if (numeric.length > 1) {
+      const digits = numeric.split('').slice(0, 4);
       const newOtp = [...otp];
-      pastedOtp.forEach((char, i) => {
-        if (index + i < OTP_LENGTH) {
-          newOtp[index + i] = char;
-        }
+      digits.forEach((digit, i) => {
+        if (index + i < 4) newOtp[index + i] = digit;
       });
       setOtp(newOtp);
-      const nextIndex = Math.min(index + pastedOtp.length, OTP_LENGTH - 1);
+      if (newOtp.every((digit) => digit !== '')) {
+        dismissKeyboard();
+        return;
+      }
+      const nextIndex = Math.min(index + digits.length, 3);
       inputRefs.current[nextIndex]?.focus();
-      const joined = newOtp.join('');
-      if (joined.length === OTP_LENGTH) verifyWithStateSync(joined);
-      return;
-    }
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    if (value && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    if (newOtp.every((digit) => digit !== '') && newOtp.join('').length === OTP_LENGTH) {
-      verifyWithStateSync(newOtp.join(''));
+    } else {
+      const newOtp = [...otp];
+      newOtp[index] = numeric;
+      setOtp(newOtp);
+      if (numeric && index < 3) {
+        inputRefs.current[index + 1]?.focus();
+        return;
+      }
+      if (newOtp.every((digit) => digit !== '')) {
+        dismissKeyboard();
+      }
     }
   };
 
@@ -120,390 +331,251 @@ export default function OTPScreen({ phoneNumber = '+91 98765 43210' }: OTPScreen
     }
   };
 
-  const handleVerifyOtp = async (otpValue: string) => {
+  const handleVerifyOTP = async () => {
+    if (isVerifyingRef.current || hasVerifiedSuccessfullyRef.current) return;
+    if (!otpSession) {
+      setOtpError('Session expired. Please go back and request OTP again.');
+      return;
+    }
+    const otpValue = otp.join('');
+    if (otpValue.length !== 4) return;
+
+    if (!/^\d{4}$/.test(otpValue)) {
+      setOtpError('OTP must be 4 digits.');
+      return;
+    }
+
+    if (otpTarget === 'email' && !email) {
+      setOtpError('Email address is missing. Please go back and enter your email.');
+      return;
+    }
+    if (otpTarget === 'phone' && !phone) {
+      setOtpError('Phone number is missing. Please go back and enter your number.');
+      return;
+    }
+
+    dismissKeyboard();
+    isVerifyingRef.current = true;
+    setLoading(true);
     setOtpError(null);
-    setVerifying(true);
+
     try {
-      const res = await verifyOtp(phoneNumber as string, otpValue);
-      const tokens = res.tokens;
-      const riderId = res.riderId;
-      if (tokens?.accessToken && tokens?.refreshToken && riderId) {
-        const { setStoredTokens, getStoredAccessToken } = await import('../api/storage');
-        await setStoredTokens(tokens.accessToken, tokens.refreshToken, riderId);
-        // Ensure token is readable from storage before navigating (avoids home API firing with no token and redirecting to login). iOS SecureStore can be slow.
+      const result = await verifyLoginOtp({
+        otpTarget,
+        otp: otpValue,
+        countryCode,
+        phone,
+        email,
+        loginMode,
+      });
+
+      const token = typeof result.token === 'string' ? result.token.trim() : '';
+      if (!result.success || !token) {
+        setOtpError(result.error || 'Invalid or expired OTP. Please try again.');
+        return;
+      }
+
+      hasVerifiedSuccessfullyRef.current = true;
+      await clearPendingOtpSession();
+
+      const riderId = result.riderId;
+      if (token && riderId) {
+        const { setStoredTokens, getStoredAccessToken } = await import('@/api/storage');
+        await setStoredTokens(token, token, riderId);
         for (let i = 0; i < 20; i++) {
           const stored = await getStoredAccessToken();
           if (stored) break;
           await new Promise((r) => setTimeout(r, 50));
         }
       }
-      console.log('[OTPScreen] OTP verified successfully:', {
-        riderId: res.riderId,
-        onboardingComplete: res.onboardingComplete,
-      });
 
-      // First-time users have placeholder name and incomplete KYC → backend sets onboardingComplete false; keep onboarding flow.
-      const onboardingComplete = res.onboardingComplete === true;
+      const onboardingComplete = result.onboardingComplete === true;
 
       let onboardingStep: OnboardingStateResponse['currentStep'] | undefined;
       try {
-        const { getOnboardingState } = await import('../api/auth');
-        const state = await getOnboardingState();
-        onboardingStep = state.currentStep;
+        const { getOnboardingState } = await import('@/api/auth');
+        const state = await Promise.race([
+          getOnboardingState(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+        ]);
+        if (state?.currentStep) {
+          onboardingStep = state.currentStep;
+        }
       } catch (e) {
         console.warn('[OTPScreen] getOnboardingState after verify failed:', e);
       }
 
       setAuthFromVerify({
-        riderId: res.riderId ?? undefined,
-        name: res.name ?? undefined,
-        phoneNumber: res.phoneNumber ?? (phoneNumber as string),
+        riderId: result.riderId ?? undefined,
+        name: result.name ?? undefined,
+        email:
+          result.email ??
+          (otpTarget === 'email' ? email : undefined),
+        phoneNumber:
+          result.phoneNumber && !isSyntheticRiderPhone(result.phoneNumber)
+            ? result.phoneNumber
+            : otpTarget === 'phone'
+              ? `${countryCode} ${phone}`
+              : '',
+        loginMethod: result.loginMethod ?? loginMode,
+        loginContact: resolveLoginContact(result.loginMethod ?? loginMode, {
+          email,
+          countryCode,
+          phone,
+        }),
         onboardingComplete,
         ...(onboardingStep !== undefined && { onboardingStep }),
-      });
-      
-      // We no longer call router.replace here. AuthGuard in _layout.tsx will
-      // automatically detect the new auth state and perform the correct redirect.
-      // This avoids race conditions and double-navigation.
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Invalid OTP';
-      setOtpError(message);
-      setOtp(Array(OTP_LENGTH).fill(''));
-      inputRefs.current[0]?.focus();
+      }, { fresh: true });
+
+      setLoading(false);
+      const nextRoute = resolvePostVerifyRoute(onboardingComplete, onboardingStep);
+      router.replace(nextRoute as never);
+    } catch (error) {
+      const msg =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to verify OTP. Please try again.';
+      setOtpError(msg);
     } finally {
-      setVerifying(false);
+      isVerifyingRef.current = false;
+      if (!hasVerifiedSuccessfullyRef.current) {
+        setLoading(false);
+      }
     }
   };
 
-  const handleResendOtp = async () => {
-    if (!canResend || sendingOtp) return;
+  const handleResend = async () => {
+    if (isResendingRef.current || resendCountdown > 0) return;
+    dismissKeyboard();
+    isResendingRef.current = true;
+    setLoading(true);
     setOtpError(null);
-    setTimer(30);
-    setCanResend(false);
-    setOtp(Array(OTP_LENGTH).fill(''));
-    inputRefs.current[0]?.focus();
-    setSendingOtp(true);
+
     try {
-      await resendOtp(phoneNumber as string);
-    } catch (err: unknown) {
-      setOtpError(err instanceof Error ? err.message : 'Failed to resend OTP');
+      const result = await resendLoginOtp({
+        loginMode,
+        countryCode,
+        phone,
+        email,
+      });
+      if (result.success) {
+        if (result.channel && otpSession) {
+          setOtpSession({ ...otpSession, channel: result.channel });
+        }
+        setResendCountdown(RESEND_COOLDOWN_SEC);
+        setOtp(['', '', '', '']);
+      } else {
+        setOtpError(result.error || result.message || 'Failed to resend OTP.');
+      }
+    } catch {
+      setOtpError('Failed to resend OTP.');
     } finally {
-      setSendingOtp(false);
+      isResendingRef.current = false;
+      setLoading(false);
     }
   };
 
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/login');
-    }
+  const handleChangeContact = async () => {
+    dismissKeyboard();
+    await clearPendingOtpSession();
+    router.replace({
+      pathname: '/login',
+      params: {
+        loginMode,
+        email: email || '',
+        phone: phone || '',
+        countryCode: countryCode || '+91',
+      },
+    });
   };
 
-  const isOtpComplete = otp.every((digit) => digit !== '') && otp.join('').length === OTP_LENGTH;
+  const changeContactLabel =
+    loginMode === 'email'
+      ? 'Change email'
+      : loginMode === 'whatsapp'
+        ? 'Change WhatsApp number'
+        : 'Change mobile number';
+
+  const isValid = otp.every((digit) => digit !== '');
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.mainContainer}>
-        {/* Scrollable Content */}
+    <Pressable style={styles.container} onPress={dismissKeyboard} accessible={false}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <AuthHeader />
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            <View style={styles.content}>
-              {/* Header Section */}
-              <View style={styles.header}>
-                {/* Back Button */}
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={handleBack}
-                  activeOpacity={0.7}
-                >
-                  <BackIcon size={scale(42)} />
-                </TouchableOpacity>
+          <View style={[styles.content, { width: contentWidth, alignSelf: 'center' }]}>
+            <View style={styles.otpCard}>
+              <Text style={styles.title}>Verify OTP</Text>
+              <Text style={styles.subtitle}>
+                Enter the 4-digit OTP sent to{' '}
+                <Text style={styles.target}>{displayTarget}</Text> via{' '}
+                <Text style={styles.target}>{channelLabel}</Text>
+                {deliveryHint}.
+              </Text>
 
-                {/* App Icon */}
-                <View style={styles.iconContainer}>
-                  <AppLogo size={scale(72)} />
-                </View>
-
-                {/* Title */}
-                <Text variant="loginTitle" color={Theme.colors.textDark} style={styles.title}>
-                  Enter OTP
-                </Text>
-
-                {/* Subtitle */}
-                <View style={styles.subtitleContainer}>
-                  <Text variant="loginSubtitle" color={Theme.colors.textGrey} style={styles.subtitle}>
-                    We've sent a 4-digit code to
-                  </Text>
-                  <Text variant="loginLabel" color={Theme.colors.textDark} style={styles.phoneNumber}>
-                    {phoneNumber}
-                  </Text>
-                </View>
+              <View style={styles.otpContainer}>
+                {otp.map((digit, index) => (
+                  <TextInput
+                    key={index}
+                    ref={(ref) => {
+                      inputRefs.current[index] = ref;
+                    }}
+                    style={[styles.otpInput, digit ? styles.otpInputFilled : null]}
+                    value={digit}
+                    onChangeText={(text) => handleOtpChange(text, index)}
+                    onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    selectTextOnFocus
+                    showSoftInputOnFocus
+                    editable={!loading}
+                    onBlur={() => {
+                      if (otp.every((d) => d !== '')) {
+                        Keyboard.dismiss();
+                      }
+                    }}
+                  />
+                ))}
               </View>
 
-              {sendingOtp && (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator size="small" color={Theme.colors.primaryMedium} />
-                  <Text variant="loginSubtitle" color={Theme.colors.textGrey} style={styles.loadingText}>
-                    Sending OTP…
-                  </Text>
-                </View>
-              )}
-              {otpError ? (
-                <Text variant="loginInfo" style={[styles.errorText, { color: '#C53030' }]}>
-                  {otpError}
-                </Text>
-              ) : null}
-              {/* OTP Input Section */}
-              <View style={styles.otpSection}>
-                <View style={styles.otpContainer}>
-                  {otp.map((digit, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.otpInputBox,
-                        focusedIndex === index && styles.otpInputBoxActive,
-                      ]}
-                    >
-                      <TextInput
-                        ref={(ref) => (inputRefs.current[index] = ref)}
-                        style={styles.otpInput}
-                        value={digit}
-                        onChangeText={(value) => handleOtpChange(value, index)}
-                        onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                        onFocus={() => setFocusedIndex(index)}
-                        onBlur={() => setFocusedIndex(null)}
-                        keyboardType="number-pad"
-                        maxLength={1}
-                        editable={!verifying}
-                        selectTextOnFocus
-                        textAlign="center"
-                      />
-                    </View>
-                  ))}
-                </View>
-              </View>
+              {otpError ? <Text style={styles.errorText}>{otpError}</Text> : null}
 
-              {/* Resend OTP Section */}
               <View style={styles.resendSection}>
-                {!canResend ? (
-                  <Text variant="loginSubtitle" color={Theme.colors.textLight} style={styles.resendText}>
-                    Resend OTP in{' '}
-                    <Text variant="loginLabel" color={Theme.colors.primaryMedium} style={styles.timerText}>
-                      {timer}s
-                    </Text>
-                  </Text>
+                {resendCountdown > 0 ? (
+                  <Text style={styles.resendTimer}>Resend OTP in {resendCountdown}s</Text>
                 ) : (
-                  <TouchableOpacity
-                    onPress={handleResendOtp}
-                    activeOpacity={0.7}
-                    style={styles.resendButton}
-                  >
-                    <Text variant="loginLabel" color={Theme.colors.primaryMedium} style={styles.resendButtonText}>
-                      Resend OTP
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </ScrollView>
-
-        {/* Fixed Bottom Section */}
-        <View style={styles.bottomSection}>
-          {/* Info Box */}
-          <View style={styles.infoBoxContainer}>
-            <View style={styles.infoBox}>
-              <View style={styles.infoTextContainer}>
-                {verifying ? (
-                  <View style={styles.verifyingRow}>
-                    <ActivityIndicator size="small" color="#32C96A" />
-                    <Text variant="loginInfo" color="#32C96A" style={styles.infoText}>
-                      Verifying OTP…
-                    </Text>
+                  <View style={styles.resendActionsRow}>
+                    <TouchableOpacity onPress={handleResend} disabled={loading} activeOpacity={0.85}>
+                      <Text style={styles.resendLink}>Resend OTP</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleChangeContact} activeOpacity={0.85}>
+                      <Text style={styles.changeContact}>{changeContactLabel}</Text>
+                    </TouchableOpacity>
                   </View>
-                ) : (
-                  <Text variant="loginInfo" color="#32C96A" style={styles.infoText}>
-                    ✨ OTP will auto-verify when entered
-                  </Text>
                 )}
               </View>
+
+              <Button
+                title="Verify & Continue"
+                onPress={handleVerifyOTP}
+                disabled={!isValid || loading}
+                loading={loading}
+                variant="primary"
+              />
             </View>
           </View>
-        </View>
-      </View>
-    </SafeAreaView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Theme.colors.backgroundLight,
-  },
-  mainContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: scale(21),
-    paddingTop: verticalScale(21),
-  },
-  content: {
-    width: '100%',
-    maxWidth: scale(360),
-    alignSelf: 'center',
-  },
-  header: {
-    marginBottom: verticalScale(21),
-  },
-  backButton: {
-    width: scale(42),
-    height: scale(42),
-    backgroundColor: Theme.colors.white,
-    borderWidth: 1,
-    borderColor: Theme.colors.borderGrey,
-    borderRadius: Theme.borderRadius.round,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: verticalScale(28),
-    // Figma shadow: 0px 1px 2px -1px rgba(0, 0, 0, 0.1), 0px 1px 3px 0px rgba(0, 0, 0, 0.1)
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1.5,
-    elevation: 2,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    marginBottom: verticalScale(42),
-  },
-  title: {
-    marginBottom: verticalScale(10.5),
-    textAlign: 'left',
-  },
-  subtitleContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  subtitle: {
-    marginRight: scale(4),
-  },
-  phoneNumber: {
-    // Phone number styles
-  },
-  otpSection: {
-    width: '100%',
-    marginBottom: verticalScale(21),
-  },
-  otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: scale(10.5),
-    width: '100%',
-  },
-  otpInputBox: {
-    width: scale(56),
-    height: scale(56),
-    backgroundColor: Theme.colors.white,
-    borderWidth: 2,
-    borderColor: Theme.colors.borderGrey,
-    borderRadius: Theme.borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Theme.shadows.small,
-  },
-  otpInputBoxActive: {
-    borderColor: '#CEE3D7',
-  },
-  otpInputBoxFilled: {
-    borderColor: Theme.colors.borderGrey,
-  },
-  otpInput: {
-    width: '100%',
-    height: '100%',
-    fontSize: Theme.typography.loginTitle.fontSize,
-    fontFamily: Theme.typography.loginTitle.fontFamily,
-    fontWeight: Theme.typography.loginTitle.fontWeight,
-    color: Theme.colors.textDark,
-    textAlign: 'center',
-  },
-  resendSection: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: verticalScale(21),
-  },
-  resendText: {
-    textAlign: 'center',
-  },
-  timerText: {
-    textAlign: 'center',
-  },
-  resendButton: {
-    paddingVertical: verticalScale(8),
-    paddingHorizontal: scale(16),
-  },
-  resendButtonText: {
-    textAlign: 'center',
-    color: Theme.colors.primaryMedium,
-  },
-  bottomSection: {
-    paddingHorizontal: scale(21),
-    paddingTop: verticalScale(28),
-    paddingBottom: verticalScale(21),
-    backgroundColor: Theme.colors.backgroundLight,
-  },
-  infoBoxContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  infoBox: {
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(50, 201, 106, 0.2)',
-    borderRadius: scale(14),
-    paddingHorizontal: scale(15),
-    paddingTop: scale(1),
-    paddingBottom: scale(1),
-    height: scale(47.5),
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-  },
-  infoTextContainer: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoText: {
-    textAlign: 'center',
-    width: '100%',
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: scale(8),
-    marginBottom: verticalScale(8),
-  },
-  loadingText: {
-    marginLeft: scale(4),
-  },
-  verifyingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: scale(8),
-  },
-  errorText: {
-    textAlign: 'center',
-    marginBottom: verticalScale(8),
-  },
-});
-

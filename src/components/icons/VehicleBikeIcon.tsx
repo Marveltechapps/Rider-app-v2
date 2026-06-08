@@ -16,7 +16,7 @@ interface VehicleBikeIconProps {
 
 export default function VehicleBikeIcon({
   size = 28,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: VehicleBikeIconProps) {
   return (

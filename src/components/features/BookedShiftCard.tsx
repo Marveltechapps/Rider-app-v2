@@ -113,8 +113,8 @@ export default function BookedShiftCard({ shift, onCancel }: BookedShiftCardProp
 
       {/* Booked Badge - Small badge at bottom */}
       <View style={styles.bookedBadge}>
-        <CheckCircleIcon size={scale(8)} color="#32C96A" />
-        <Text variant="caption" color="#32C96A" style={styles.bookedText}>
+        <CheckCircleIcon size={scale(8)} color="#237227" />
+        <Text variant="caption" color="#237227" style={styles.bookedText}>
           BOOKED
         </Text>
       </View>
@@ -124,7 +124,7 @@ export default function BookedShiftCard({ shift, onCancel }: BookedShiftCardProp
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(50, 201, 106, 0.05)', // Lighter green background
+    backgroundColor: 'rgba(35, 114, 39, 0.05)', // Lighter green background
     borderRadius: scale(8),
     padding: scale(16),
     paddingBottom: scale(28), // Extra padding at bottom for booked badge
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     fontSize: scale(9),
     lineHeight: scale(13),
     fontWeight: '700',
-    color: '#32C96A',
+    color: '#237227',
   },
   peakTimeBadge: {
     position: 'absolute',
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     paddingVertical: scale(1.75),
     paddingHorizontal: scale(7),
     borderWidth: 1,
-    borderColor: `rgba(50, 201, 106, 0.3)`, // Subtle app theme green
+    borderColor: `rgba(35, 114, 39, 0.3)`, // Subtle app theme green
     borderRadius: scale(8),
   },
   breakBadge: {
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     paddingLeft: scale(7),
     backgroundColor: 'rgb(255, 255, 255)',
     borderWidth: 0.6,
-    borderColor: `rgba(50, 201, 106, 0.4)`, // Subtle app theme green
+    borderColor: `rgba(35, 114, 39, 0.4)`, // Subtle app theme green
     borderRadius: scale(8),
   },
   incentiveText: {

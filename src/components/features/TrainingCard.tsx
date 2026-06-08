@@ -156,7 +156,7 @@ export default function TrainingCard({
         ) : (
           <View style={styles.playButtonContainer}>
             <View style={styles.playButtonCircle}>
-              <PlayIcon size={scale(17.5)} color="#32C96A" />
+              <PlayIcon size={scale(17.5)} color="#237227" />
             </View>
           </View>
         )}

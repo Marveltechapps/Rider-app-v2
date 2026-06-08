@@ -49,7 +49,7 @@ const paymentIssuesStyles = StyleSheet.create({
     width: scale(48),
     height: scale(48),
     borderRadius: scale(12),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },

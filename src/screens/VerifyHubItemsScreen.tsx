@@ -209,7 +209,7 @@ export default function VerifyHubItemsScreen() {
             {submitting ? 'Saving…' : remaining > 0 ? `Pick ${remaining} More Items` : 'Proceed to Delivery'}
           </Text>
           <View style={verifyHubItemsStyles.bottomButtonRightIcon}>
-            <RightArrowIcon size={scale(21)} color="#32C96A" />
+            <RightArrowIcon size={scale(21)} color="#237227" />
           </View>
         </TouchableOpacity>
       </View>

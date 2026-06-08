@@ -399,7 +399,7 @@ export default function UpdatePaymentDetailsScreen() {
                   </TouchableOpacity>
 
                   {isUpiVerified ? (
-                    <Text variant="caption" color="#32C96A" style={updatePaymentStyles.verificationNote}>
+                    <Text variant="caption" color="#237227" style={updatePaymentStyles.verificationNote}>
                       UPI ID format looks valid. We may send a ₹1 test deposit to verify this account.
                     </Text>
                   ) : null}

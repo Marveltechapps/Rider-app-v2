@@ -1,17 +1,22 @@
 /**
  * Color Palette
- * Extracted from Figma design system
+ * Brand green aligned with logo: #237227
  */
 
+/** Logo / primary brand green */
+export const BRAND_GREEN = '#237227';
+/** RGB components for rgba(...) tints */
+export const BRAND_GREEN_RGB = '35, 114, 39';
+
 export const Colors = {
-  // Primary brand colors
-  primary: '#42D97B',
-  primaryLight: '#E5F8EF',
-  primaryDark: '#16C45C',
-  primaryMedium: '#32C96A',
+  // Primary brand colors (logo green #237227)
+  primary: BRAND_GREEN,
+  primaryLight: '#E6F0E7',
+  primaryDark: '#1B5A1F',
+  primaryMedium: BRAND_GREEN,
 
   // Status colors
-  success: '#42D97B',
+  success: BRAND_GREEN,
   error: '#F44336',
   warning: '#FF9800',
   info: '#2196F3',
@@ -46,8 +51,7 @@ export const Colors = {
   borderLight: '#F0F0F0',
   borderGrey: '#E5E7EB',
   overlay: 'rgba(0, 0, 0, 0.5)',
-  // Login screen specific
-  infoBoxBg: 'rgba(50, 201, 106, 0.1)',
-  infoBoxBorder: 'rgba(50, 201, 106, 0.2)',
+  // Login / info surfaces
+  infoBoxBg: `rgba(${BRAND_GREEN_RGB}, 0.1)`,
+  infoBoxBorder: `rgba(${BRAND_GREEN_RGB}, 0.2)`,
 };
-

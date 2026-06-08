@@ -246,7 +246,7 @@ export default function EarningsWeekScreen() {
       >
         {/* Total Earnings Card */}
         <LinearGradient
-          colors={['#32C96A', '#2AB85E']}
+          colors={['#237227', '#1B5A1F']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={earningsStyles.earningsCard}

@@ -10,6 +10,8 @@ const KEY_REFRESH = 'rider_refresh_token';
 const KEY_RIDER_ID = 'rider_id';
 const KEY_ONBOARD_STEP = 'onboarding_step';
 const KEY_ONBOARDING_COMPLETE = 'onboarding_complete';
+const KEY_LOGIN_METHOD = 'login_method';
+const KEY_LOGIN_CONTACT = 'login_contact';
 
 const PREFIX = 'rider_auth_';
 
@@ -96,6 +98,8 @@ export async function clearStoredAuth(): Promise<void> {
     await webDelete(K.refresh);
     await webDelete(K.riderId);
     await webDelete(KEY_ONBOARDING_COMPLETE);
+    await webDelete(KEY_LOGIN_METHOD);
+    await webDelete(KEY_LOGIN_CONTACT);
     return;
   }
   const SecureStore = await import('expo-secure-store');
@@ -104,6 +108,8 @@ export async function clearStoredAuth(): Promise<void> {
     SecureStore.deleteItemAsync(K.refresh),
     SecureStore.deleteItemAsync(K.riderId),
     SecureStore.deleteItemAsync(KEY_ONBOARDING_COMPLETE),
+    SecureStore.deleteItemAsync(KEY_LOGIN_METHOD),
+    SecureStore.deleteItemAsync(KEY_LOGIN_CONTACT),
   ]);
 }
 
@@ -163,4 +169,28 @@ export async function clearStoredOnboardingComplete(): Promise<void> {
   }
   const SecureStore = await import('expo-secure-store');
   await SecureStore.deleteItemAsync(KEY_ONBOARDING_COMPLETE);
+}
+
+export async function setStoredLoginSession(
+  loginMethod: string,
+  loginContact: string
+): Promise<void> {
+  if (isWeb()) {
+    await webSet(KEY_LOGIN_METHOD, loginMethod);
+    await webSet(KEY_LOGIN_CONTACT, loginContact);
+    return;
+  }
+  const SecureStore = await import('expo-secure-store');
+  await Promise.all([
+    SecureStore.setItemAsync(KEY_LOGIN_METHOD, loginMethod),
+    SecureStore.setItemAsync(KEY_LOGIN_CONTACT, loginContact),
+  ]);
+}
+
+export async function getStoredLoginMethod(): Promise<string | null> {
+  return isWeb() ? webGet(KEY_LOGIN_METHOD) : nativeGet(KEY_LOGIN_METHOD);
+}
+
+export async function getStoredLoginContact(): Promise<string | null> {
+  return isWeb() ? webGet(KEY_LOGIN_CONTACT) : nativeGet(KEY_LOGIN_CONTACT);
 }

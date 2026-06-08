@@ -14,7 +14,7 @@ const deliveryCompleteStyles = StyleSheet.create({
   },
   mainContainer: {
     flex: 1,
-    backgroundColor: Theme.colors.primaryMedium, // #32C96A
+    backgroundColor: Theme.colors.primaryMedium, // #237227
   },
   bottomFooter: {
     flexShrink: 0,
@@ -143,7 +143,7 @@ const deliveryCompleteStyles = StyleSheet.create({
     width: scale(28),
     height: scale(28),
     borderRadius: scale(14),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },

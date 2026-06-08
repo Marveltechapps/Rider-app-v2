@@ -187,7 +187,7 @@ export default function HelpSupportScreen() {
               activeOpacity={0.7}
             >
               <View style={helpSupportStyles.contactIconContainer}>
-                <PhoneIcon size={scale(17.5)} color="#32C96A" />
+                <PhoneIcon size={scale(17.5)} color="#237227" />
               </View>
               <View style={helpSupportStyles.contactInfo}>
                 <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>
@@ -205,7 +205,7 @@ export default function HelpSupportScreen() {
               activeOpacity={0.7}
             >
               <View style={helpSupportStyles.contactIconContainer}>
-                <EmailIcon size={scale(17.5)} color="#32C96A" />
+                <EmailIcon size={scale(17.5)} color="#237227" />
               </View>
               <View style={helpSupportStyles.contactInfo}>
                 <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>
@@ -223,7 +223,7 @@ export default function HelpSupportScreen() {
               activeOpacity={0.7}
             >
               <View style={helpSupportStyles.contactIconContainer}>
-                <ChatIcon size={scale(17.5)} color="#32C96A" />
+                <ChatIcon size={scale(17.5)} color="#237227" />
               </View>
               <View style={helpSupportStyles.contactInfo}>
                 <Text variant="body" color="#101828" style={helpSupportStyles.contactLabel}>

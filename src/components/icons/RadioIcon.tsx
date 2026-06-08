@@ -19,7 +19,7 @@ export default function RadioIcon({
   size = 21,
   selected = false,
   color = '#F3F4F6',
-  selectedColor = '#32C96A',
+  selectedColor = '#237227',
   style,
 }: RadioIconProps) {
   return (

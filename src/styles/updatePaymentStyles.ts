@@ -106,7 +106,7 @@ const updatePaymentStyles = StyleSheet.create({
   },
   verifyUpiButtonText: {
     fontWeight: '700',
-    color: '#32C96A',
+    color: '#237227',
     textAlign: 'center',
   },
 
@@ -115,7 +115,7 @@ const updatePaymentStyles = StyleSheet.create({
     fontSize: scale(12),
     fontWeight: '400',
     lineHeight: scale(14),
-    color: '#32C96A',
+    color: '#237227',
   },
 
   // Save Button
@@ -140,10 +140,10 @@ const updatePaymentStyles = StyleSheet.create({
     gap: scale(20),
     paddingVertical: verticalScale(6),
     paddingHorizontal: scale(16),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: scale(8),
     height: scale(42),
-    shadowColor: '#32C96A',
+    shadowColor: '#237227',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 10,

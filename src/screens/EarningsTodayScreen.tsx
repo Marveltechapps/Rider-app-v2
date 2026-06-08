@@ -184,7 +184,7 @@ export default function EarningsTodayScreen() {
       >
         {/* Total Earnings Card */}
         <LinearGradient
-          colors={['rgba(50, 201, 106, 1)', 'rgba(42, 184, 94, 1)']}
+          colors={['rgba(35, 114, 39, 1)', 'rgba(27, 90, 31, 1)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={earningsStyles.earningsCard}

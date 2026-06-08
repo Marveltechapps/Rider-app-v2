@@ -100,6 +100,8 @@ export default function VerificationScreen() {
   useEffect(() => {
     let cancelled = false;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollAttempts = 0;
+    const MAX_POLL_ATTEMPTS = 8;
 
     const pollKyc = async () => {
       try {
@@ -107,7 +109,12 @@ export default function VerificationScreen() {
         if (cancelled) return;
         const docs = res.documents ?? [];
         if (docs.length === 0) {
-          pollTimer = setTimeout(pollKyc, 3000);
+          pollAttempts += 1;
+          if (pollAttempts < MAX_POLL_ATTEMPTS) {
+            pollTimer = setTimeout(pollKyc, 3000);
+          } else {
+            setAllVerified(true);
+          }
           return;
         }
         setDocuments(
@@ -117,15 +124,30 @@ export default function VerificationScreen() {
             verifying: d.status === 'pending',
           }))
         );
+        const required = docs.filter((d) => d.required !== false);
+        const scope = required.length ? required : docs;
+        const allRequiredSubmitted = scope.every(
+          (d) => d.status === 'verified' || d.status === 'pending' || d.status === 'failed'
+        );
         const allDone = docs.every((d) => d.status === 'verified' || d.status === 'failed');
-        const anyPending = docs.some((d) => d.status === 'pending');
-        if (allDone || !anyPending) {
+        if (allRequiredSubmitted || allDone) {
           setAllVerified(true);
         } else {
-          pollTimer = setTimeout(pollKyc, 3000);
+          pollAttempts += 1;
+          if (pollAttempts < MAX_POLL_ATTEMPTS) {
+            pollTimer = setTimeout(pollKyc, 3000);
+          } else {
+            setAllVerified(true);
+          }
         }
       } catch {
-        if (!cancelled) pollTimer = setTimeout(pollKyc, 5000);
+        if (cancelled) return;
+        pollAttempts += 1;
+        if (pollAttempts < MAX_POLL_ATTEMPTS) {
+          pollTimer = setTimeout(pollKyc, 5000);
+        } else {
+          setAllVerified(true);
+        }
       }
     };
 
@@ -300,10 +322,10 @@ const styles = StyleSheet.create({
     width: scale(84),
     height: scale(84),
     borderRadius: scale(42),
-    backgroundColor: Theme.colors.primaryMedium, // #32C96A
+    backgroundColor: Theme.colors.primaryMedium, // #237227
     justifyContent: 'center',
     alignItems: 'center',
-    // Shadow: 0px 8px 10px -6px rgba(50, 201, 106, 0.3), 0px 20px 25px -5px rgba(50, 201, 106, 0.3)
+    // Shadow: 0px 8px 10px -6px rgba(35, 114, 39, 0.3), 0px 20px 25px -5px rgba(35, 114, 39, 0.3)
     shadowColor: Theme.colors.primaryMedium,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
@@ -322,7 +344,7 @@ const styles = StyleSheet.create({
     width: scale(168),
     height: scale(168),
     borderRadius: scale(84),
-    backgroundColor: 'rgba(50, 201, 106, 0.2)', // Figma: rgba(50, 201, 106, 0.2)
+    backgroundColor: 'rgba(35, 114, 39, 0.2)', // Figma: rgba(35, 114, 39, 0.2)
     opacity: 0, // Figma shows opacity: 0
     top: scale(-42), // Center the 168px circle behind 84px spinner
     left: scale(-42),
@@ -335,7 +357,7 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.white,
     borderRadius: scale(42),
     borderWidth: 4,
-    borderColor: 'rgba(50, 201, 106, 0.1)', // Figma: rgba(50, 201, 106, 0.1)
+    borderColor: 'rgba(35, 114, 39, 0.1)', // Figma: rgba(35, 114, 39, 0.1)
     ...Theme.shadows.medium,
   },
   title: {
@@ -447,9 +469,9 @@ const styles = StyleSheet.create({
     opacity: 0.5, // Figma: opacity: 0.5
   },
   startTrainingButtonEnabled: {
-    backgroundColor: Theme.colors.primaryMedium, // #32C96A
+    backgroundColor: Theme.colors.primaryMedium, // #237227
     opacity: 1,
-    // Shadow: 0px 4px 6px -4px rgba(50, 201, 106, 0.2), 0px 10px 15px -3px rgba(50, 201, 106, 0.2)
+    // Shadow: 0px 4px 6px -4px rgba(35, 114, 39, 0.2), 0px 10px 15px -3px rgba(35, 114, 39, 0.2)
     shadowColor: Theme.colors.primaryMedium,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,

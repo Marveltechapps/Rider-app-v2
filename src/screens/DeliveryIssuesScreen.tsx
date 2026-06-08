@@ -86,7 +86,7 @@ export default function DeliveryIssuesScreen() {
             >
               <View style={paymentIssuesStyles.topicCardLeft}>
                 <View style={paymentIssuesStyles.topicIconContainer}>
-                  <PackageIcon size={scale(24)} color="#32C96A" />
+                  <PackageIcon size={scale(24)} color="#237227" />
                 </View>
                 <View style={paymentIssuesStyles.topicInfo}>
                   <Text variant="body" color="#101828" style={paymentIssuesStyles.topicTitle}>

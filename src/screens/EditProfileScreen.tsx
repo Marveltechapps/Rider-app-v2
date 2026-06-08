@@ -25,6 +25,7 @@ import PhoneIcon from '../components/icons/PhoneIcon';
 import UserIcon from '../components/icons/UserIcon';
 import ProfileScreenShell from '../components/layout/ProfileScreenShell';
 import { useUser } from '../contexts';
+import { isSyntheticRiderPhone } from '@/utils/loginContact';
 import { getMe, uploadProfilePhoto } from '../api/auth';
 import { updateRider } from '../api/rider';
 import editProfileStyles from '../styles/editProfileStyles';
@@ -54,10 +55,19 @@ export default function EditProfileScreen() {
   };
 
   // Initialize profile from userData - this ensures existing data from login flow is shown
+  const initialPhone = () => {
+    if (userData.loginMethod === 'email' && isSyntheticRiderPhone(userData.phoneNumber)) return '';
+    return normalizePhoneDigits(userData.phoneNumber || '');
+  };
+  const initialEmail = () => {
+    if (userData.loginMethod === 'email' && userData.loginContact) return userData.loginContact;
+    return userData.email || '';
+  };
+
   const [profile, setProfile] = useState<Profile>(() => ({
     fullName: resolveDisplayName(userData.name || ''),
-    phoneNumber: normalizePhoneDigits(userData.phoneNumber || ''),
-    email: userData.email || '',
+    phoneNumber: initialPhone(),
+    email: initialEmail(),
     avatarUri: userData.profilePhotoUri || null,
   }));
   const [errors, setErrors] = useState<ProfileFieldErrors>({});
@@ -70,13 +80,19 @@ export default function EditProfileScreen() {
   useEffect(() => {
     setProfile({
       fullName: resolveDisplayName(userData.name || ''),
-      phoneNumber: normalizePhoneDigits(userData.phoneNumber || ''),
-      email: userData.email || '',
+      phoneNumber:
+        userData.loginMethod === 'email' && isSyntheticRiderPhone(userData.phoneNumber)
+          ? ''
+          : normalizePhoneDigits(userData.phoneNumber || ''),
+      email:
+        userData.loginMethod === 'email' && userData.loginContact
+          ? userData.loginContact
+          : userData.email || '',
       avatarUri: userData.profilePhotoUri || null,
     });
     setErrors({});
     setSubmitError(null);
-  }, [userData.name, userData.phoneNumber, userData.email, userData.profilePhotoUri]);
+  }, [userData.name, userData.phoneNumber, userData.email, userData.profilePhotoUri, userData.loginMethod, userData.loginContact]);
 
   const handleTakePhoto = useCallback(async () => {
     try {
@@ -307,7 +323,7 @@ export default function EditProfileScreen() {
                 />
               ) : (
                 <View style={editProfileStyles.photoPlaceholder}>
-                  <UserIcon size={scale(42)} color="#32C96A" />
+                  <UserIcon size={scale(42)} color="#237227" />
                 </View>
               )}
             </View>

@@ -4,7 +4,8 @@
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
-import { clearStoredAuth, getStoredAccessToken, getStoredRiderId, getStoredOnboardingComplete, setStoredOnboardingComplete, clearStoredOnboardingStep } from '@/api/storage';
+import { clearStoredAuth, getStoredAccessToken, getStoredRiderId, getStoredOnboardingComplete, getStoredLoginContact, getStoredLoginMethod, setStoredOnboardingComplete, clearStoredOnboardingStep } from '@/api/storage';
+import type { LoginMode } from '@/services/auth.service';
 import { AUTH_REQUIRED_MESSAGE } from '@/api/client';
 import { getMe } from '@/api/auth';
 import { logStartupNav, tokenPresenceLabel } from '@/utils/startupNavigation';
@@ -19,6 +20,8 @@ interface UserData {
   hubId: string | null;
   hubName: string | null;
   riderId: string | null;
+  loginMethod: LoginMode | null;
+  loginContact: string;
   onboardingComplete: boolean;
   onboardingStep: 'profile' | 'location' | 'vehicle' | 'profile-photo' | 'documents' | 'training' | 'kit' | 'complete' | null;
   // Document data from login flow
@@ -48,13 +51,18 @@ interface UserContextType {
   authLoaded: boolean;
   updateUserData: (data: Partial<UserData>) => void;
   clearUserData: () => void;
+  /** Wipe tokens + in-memory profile before a new OTP login (mobile / email / WhatsApp). */
+  beginFreshLoginSession: () => Promise<void>;
   setAuthFromVerify: (data: {
     riderId?: string;
     name?: string;
+    email?: string;
     phoneNumber?: string;
+    loginMethod?: LoginMode;
+    loginContact?: string;
     onboardingComplete?: boolean;
     onboardingStep?: UserData['onboardingStep'];
-  }) => void;
+  }, options?: { fresh?: boolean }) => void;
   logout: () => Promise<void>;
 }
 
@@ -68,6 +76,8 @@ const initialUserData: UserData = {
   hubId: null,
   hubName: null,
   riderId: null,
+  loginMethod: null,
+  loginContact: '',
   onboardingComplete: false,
   onboardingStep: null,
   aadharUri: null,
@@ -98,22 +108,57 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUserData(initialUserData);
   }, []);
 
+  const beginFreshLoginSession = useCallback(async () => {
+    await clearStoredAuth();
+    clearUserData();
+  }, [clearUserData]);
+
   const setAuthFromVerify = useCallback(
-    (data: {
-      riderId?: string;
-      name?: string;
-      phoneNumber?: string;
-      onboardingComplete?: boolean;
-      onboardingStep?: UserData['onboardingStep'];
-    }) => {
+    (
+      data: {
+        riderId?: string;
+        name?: string;
+        email?: string;
+        phoneNumber?: string;
+        loginMethod?: LoginMode;
+        loginContact?: string;
+        onboardingComplete?: boolean;
+        onboardingStep?: UserData['onboardingStep'];
+      },
+      options?: { fresh?: boolean }
+    ) => {
       if (data.onboardingComplete) {
         void setStoredOnboardingComplete(true);
       }
+      if (data.loginMethod && data.loginContact) {
+        void import('@/api/storage').then(({ setStoredLoginSession }) =>
+          setStoredLoginSession(data.loginMethod!, data.loginContact!)
+        );
+      }
+
+      if (options?.fresh) {
+        setUserData({
+          ...initialUserData,
+          riderId: data.riderId ?? null,
+          name: data.name ?? '',
+          email: data.email ?? '',
+          phoneNumber: data.phoneNumber ?? '',
+          loginMethod: data.loginMethod ?? null,
+          loginContact: data.loginContact ?? '',
+          onboardingComplete: data.onboardingComplete ?? false,
+          onboardingStep: data.onboardingStep ?? null,
+        });
+        return;
+      }
+
       setUserData(prev => ({
         ...prev,
         ...(data.riderId != null && { riderId: data.riderId }),
         ...(data.name != null && { name: data.name }),
+        ...(data.email != null && { email: data.email }),
         ...(data.phoneNumber != null && { phoneNumber: data.phoneNumber }),
+        ...(data.loginMethod != null && { loginMethod: data.loginMethod }),
+        ...(data.loginContact != null && { loginContact: data.loginContact }),
         ...(data.onboardingComplete != null && { onboardingComplete: data.onboardingComplete }),
         ...(data.onboardingStep !== undefined && { onboardingStep: data.onboardingStep }),
       }));
@@ -213,10 +258,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const [riderId, accessToken, storedComplete] = await Promise.all([
+        const [riderId, accessToken, storedComplete, storedLoginMethod, storedLoginContact] = await Promise.all([
           getStoredRiderId(),
           getStoredAccessToken(),
           getStoredOnboardingComplete(),
+          getStoredLoginMethod(),
+          getStoredLoginContact(),
         ]);
         if (cancelled) return;
         if (!accessToken) {
@@ -239,6 +286,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
           ...(riderId ? { riderId } : {}),
           onboardingComplete: storedComplete,
           ...(storedComplete ? { onboardingStep: 'complete' as const } : {}),
+          ...(storedLoginMethod ? { loginMethod: storedLoginMethod as LoginMode } : {}),
+          ...(storedLoginContact ? { loginContact: storedLoginContact } : {}),
         }));
         setAuthLoaded(true);
         void hydrateSessionFromBackend();
@@ -261,6 +310,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         authLoaded,
         updateUserData,
         clearUserData,
+        beginFreshLoginSession,
         setAuthFromVerify,
         logout,
       }}

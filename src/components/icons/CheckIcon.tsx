@@ -15,7 +15,7 @@ interface CheckIconProps {
 
 export default function CheckIcon({
   size = 21,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: CheckIconProps) {
   return (

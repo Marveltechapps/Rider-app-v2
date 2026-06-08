@@ -34,7 +34,7 @@ export const OrderDetailsAssets = {
     nodeId: '13506:2244',
     description: 'Hub/store icon container with green background',
     dimensions: { width: 49, height: 49 },
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderRadius: 14,
   },
   dispatchBayIcon: {
@@ -48,7 +48,7 @@ export const OrderDetailsAssets = {
     nodeId: '13506:2264',
     description: 'Green circular call button icon with shadow',
     dimensions: { width: 42, height: 42 },
-    shadow: '0px 4px 6px -4px rgba(50, 201, 106, 0.2), 0px 10px 15px -3px rgba(50, 201, 106, 0.2)',
+    shadow: '0px 4px 6px -4px rgba(35, 114, 39, 0.2), 0px 10px 15px -3px rgba(35, 114, 39, 0.2)',
   },
   // Legacy icons (kept for reference)
   iconCallButton: {
@@ -102,7 +102,7 @@ export const OrderDetailsAssetPaths = {
  * 1. Hub Icon Container (13506:2244)
  *    - Format: SVG or PNG
  *    - Size: 49x49px (export at 2x: 98x98, 3x: 147x147)
- *    - Background: rgba(50, 201, 106, 0.1)
+ *    - Background: rgba(35, 114, 39, 0.1)
  *    - Border Radius: 14px
  *    - Location: src/assets/orderDetails/icon-hub-container.svg
  *    - ✅ Downloaded
@@ -116,9 +116,9 @@ export const OrderDetailsAssetPaths = {
  * 3. Call Button (13506:2264)
  *    - Format: SVG or PNG
  *    - Size: 42x42px (export at 2x: 84x84, 3x: 126x126)
- *    - Background: #32C96A (green)
+ *    - Background: #237227 (green)
  *    - Border Radius: 21px (circular)
- *    - Shadow: 0px 4px 6px -4px rgba(50, 201, 106, 0.2), 0px 10px 15px -3px rgba(50, 201, 106, 0.2)
+ *    - Shadow: 0px 4px 6px -4px rgba(35, 114, 39, 0.2), 0px 10px 15px -3px rgba(35, 114, 39, 0.2)
  *    - Location: src/assets/orderDetails/icon-call-button-green.svg
  *    - ✅ Downloaded
  * 

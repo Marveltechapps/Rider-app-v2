@@ -51,8 +51,8 @@ const paymentDetailsStyles = StyleSheet.create({
     shadowColor: '#155DFC',
   },
   methodCardUpi: {
-    backgroundColor: '#32C96A',
-    shadowColor: '#32C96A',
+    backgroundColor: '#237227',
+    shadowColor: '#237227',
   },
   methodCardTitle: {
     color: '#FFFFFF',
@@ -128,13 +128,13 @@ const paymentDetailsStyles = StyleSheet.create({
   primaryActionButton: {
     flex: 1,
     minHeight: scale(48),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: scale(12),
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: scale(16),
     paddingVertical: verticalScale(12),
-    shadowColor: '#32C96A',
+    shadowColor: '#237227',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 10,

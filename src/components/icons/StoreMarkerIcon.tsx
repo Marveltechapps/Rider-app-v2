@@ -15,7 +15,7 @@ interface StoreMarkerIconProps {
 
 export default function StoreMarkerIcon({ 
   size = 7, 
-  color = '#32C96A',
+  color = '#237227',
   style 
 }: StoreMarkerIconProps) {
   return (

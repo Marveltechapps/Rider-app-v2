@@ -497,7 +497,7 @@ export default function HomeScreen() {
                   icon={<EarningsStatIcon size={scale(28)} />}
                   value={`₹${amountCollectedCod.toFixed(0)}`}
                   label="COD Collected Today"
-                  iconBgColor="rgba(50, 201, 106, 0.1)"
+                  iconBgColor="rgba(35, 114, 39, 0.1)"
                 />
                 <StatCard
                   icon={<OrdersStatIcon size={scale(28)} />}
@@ -990,9 +990,9 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(8),
     paddingVertical: verticalScale(10),
     paddingHorizontal: scale(20),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: scale(8),
-    shadowColor: '#32C96A',
+    shadowColor: '#237227',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,

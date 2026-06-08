@@ -10,7 +10,7 @@ interface ArrowUpIconProps {
 
 export default function ArrowUpIcon({
   size = 3.5,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: ArrowUpIconProps) {
   return (

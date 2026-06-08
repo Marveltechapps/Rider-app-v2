@@ -560,11 +560,11 @@ const styles = StyleSheet.create({
     bottom: scale(2),
     left: scale(2),
     right: scale(2),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     zIndex: 0,
   },
   daySelectedBackgroundFull: {
-    backgroundColor: 'rgba(50, 201, 106, 0.15)',
+    backgroundColor: 'rgba(35, 114, 39, 0.15)',
     borderRadius: scale(8),
     left: 0,
     right: 0,

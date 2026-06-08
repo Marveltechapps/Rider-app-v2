@@ -16,7 +16,7 @@ interface LocationIconProps {
 
 export default function LocationIcon({
   size = 18,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: LocationIconProps) {
   return (

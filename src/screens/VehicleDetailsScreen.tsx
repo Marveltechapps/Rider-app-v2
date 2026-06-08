@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.white,
   },
   vehicleCardBikeSelected: {
-    backgroundColor: Theme.colors.infoBoxBg, // Exact Figma: rgba(50, 201, 106, 0.1)
+    backgroundColor: Theme.colors.infoBoxBg, // Exact Figma: rgba(35, 114, 39, 0.1)
   },
   vehicleLabel: {
     fontSize: scale(12.25),

@@ -67,7 +67,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
 
         {/* Payout and Duration */}
         <View style={historyStyles.orderCardRight}>
-          <Text variant="body" color="#32C96A" style={historyStyles.orderPayout}>
+          <Text variant="body" color="#237227" style={historyStyles.orderPayout}>
             ₹{order.payout}
           </Text>
           <Text variant="caption" color="#6B7280" style={historyStyles.orderDuration}>
@@ -81,7 +81,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
         {/* Store Name */}
         <View style={historyStyles.orderDetailRow}>
           <View style={historyStyles.orderDetailIconContainer}>
-            <StoreMarkerIcon size={scale(7)} color="#32C96A" />
+            <StoreMarkerIcon size={scale(7)} color="#237227" />
           </View>
           <Text variant="bodySm" color="#4A5565" style={historyStyles.orderDetailText}>
             {order.storeName}
@@ -90,7 +90,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
 
         {/* Area */}
         <View style={historyStyles.orderDetailRow}>
-          <LocationPinIcon size={scale(21)} color="#32C96A" />
+          <LocationPinIcon size={scale(21)} color="#237227" />
           <Text variant="bodySm" color="#4A5565" style={historyStyles.orderDetailText}>
             {order.area}
           </Text>

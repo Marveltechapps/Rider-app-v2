@@ -15,7 +15,7 @@ interface PlayIconProps {
 
 export default function PlayIcon({
   size = 18,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: PlayIconProps) {
   return (

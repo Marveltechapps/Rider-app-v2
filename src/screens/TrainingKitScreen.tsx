@@ -499,8 +499,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   completeButton: {
-    backgroundColor: Theme.colors.primaryMedium, // #32C96A
-    // Shadow: 0px 4px 6px -4px rgba(50, 201, 106, 0.2), 0px 10px 15px -3px rgba(50, 201, 106, 0.2)
+    backgroundColor: Theme.colors.primaryMedium, // #237227
+    // Shadow: 0px 4px 6px -4px rgba(35, 114, 39, 0.2), 0px 10px 15px -3px rgba(35, 114, 39, 0.2)
     shadowColor: Theme.colors.primaryMedium,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,

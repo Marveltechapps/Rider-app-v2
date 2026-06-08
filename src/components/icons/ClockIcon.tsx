@@ -10,7 +10,7 @@ interface ClockIconProps {
 
 export default function ClockIcon({
   size = 10,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: ClockIconProps) {
   return (

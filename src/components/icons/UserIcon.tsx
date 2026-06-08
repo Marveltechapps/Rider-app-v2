@@ -15,7 +15,7 @@ interface UserIconProps {
 
 export default function UserIcon({ 
   size = 24, 
-  color = '#32C96A',
+  color = '#237227',
   style 
 }: UserIconProps) {
   return (

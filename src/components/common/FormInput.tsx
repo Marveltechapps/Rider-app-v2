@@ -38,7 +38,7 @@ export default function FormInput({
   const inputBorderColor = error
     ? '#E53935'
     : isFocused
-    ? '#32C96A'
+    ? '#237227'
     : '#E5E7EB';
 
   const textColor = value ? '#717182' : '#717182';

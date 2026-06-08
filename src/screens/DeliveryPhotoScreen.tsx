@@ -160,14 +160,14 @@ export default function DeliveryPhotoScreen() {
           <View
             style={{
               padding: scale(12),
-              backgroundColor: 'rgba(50, 201, 106, 0.08)',
+              backgroundColor: 'rgba(35, 114, 39, 0.08)',
               borderRadius: scale(10),
               borderWidth: 1,
-              borderColor: 'rgba(50, 201, 106, 0.25)',
+              borderColor: 'rgba(35, 114, 39, 0.25)',
               gap: scale(4),
             }}
           >
-            <Text variant="bodySm" color="#32C96A" style={{ fontWeight: '700' }}>
+            <Text variant="bodySm" color="#237227" style={{ fontWeight: '700' }}>
               Uploaded to AWS S3
             </Text>
             <Text variant="caption" color="#6A7282" numberOfLines={2}>

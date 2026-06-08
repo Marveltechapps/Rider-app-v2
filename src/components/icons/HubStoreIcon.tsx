@@ -16,7 +16,7 @@ interface HubStoreIconProps {
 
 export default function HubStoreIcon({
   size = 24,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: HubStoreIconProps) {
   return (

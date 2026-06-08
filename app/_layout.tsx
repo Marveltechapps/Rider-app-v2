@@ -46,7 +46,6 @@ const ONBOARDING_ROUTES = [
   'vehicle-insurance-upload',
   'document-view',
   'verification',
-  'verification-success',
   'training-kit'
 ];
 
@@ -371,7 +370,6 @@ export default function RootLayout() {
                         <Stack.Screen name="vehicle-insurance-upload" options={{ headerShown: false, animation: 'slide_from_right' }} />
                         <Stack.Screen name="document-view" options={{ headerShown: false, animation: 'slide_from_right' }} />
                         <Stack.Screen name="verification" options={{ headerShown: false, animation: 'slide_from_right' }} />
-                        <Stack.Screen name="verification-success" options={{ headerShown: false, animation: 'slide_from_right' }} />
                         <Stack.Screen name="training-kit" options={{ headerShown: false, animation: 'slide_from_right' }} />
                         
                         {/* Main App */}

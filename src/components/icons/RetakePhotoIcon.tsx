@@ -16,7 +16,7 @@ interface RetakePhotoIconProps {
 
 export default function RetakePhotoIcon({
   size = 14,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: RetakePhotoIconProps) {
   return (

@@ -152,7 +152,7 @@ export default function MyDocumentsScreen() {
         </View>
 
         {isRefetching ? (
-          <ActivityIndicator size="small" color="#32C96A" style={{ marginVertical: verticalScale(8) }} />
+          <ActivityIndicator size="small" color="#237227" style={{ marginVertical: verticalScale(8) }} />
         ) : null}
 
         <View style={documentsStyles.documentsSection}>

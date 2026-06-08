@@ -15,7 +15,7 @@ interface EmailIconProps {
 
 export default function EmailIcon({ 
   size = 18, 
-  color = '#32C96A',
+  color = '#237227',
   style 
 }: EmailIconProps) {
   return (

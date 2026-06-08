@@ -38,7 +38,7 @@ export default function DeliveryProofSuccessScreen() {
             width: scale(72),
             height: scale(72),
             borderRadius: scale(36),
-            backgroundColor: 'rgba(50, 201, 106, 0.12)',
+            backgroundColor: 'rgba(35, 114, 39, 0.12)',
             justifyContent: 'center',
             alignItems: 'center',
           }}
@@ -76,13 +76,13 @@ export default function DeliveryProofSuccessScreen() {
           style={{
             width: '100%',
             padding: scale(12),
-            backgroundColor: 'rgba(50, 201, 106, 0.08)',
+            backgroundColor: 'rgba(35, 114, 39, 0.08)',
             borderRadius: scale(10),
             borderWidth: 1,
-            borderColor: 'rgba(50, 201, 106, 0.2)',
+            borderColor: 'rgba(35, 114, 39, 0.2)',
           }}
         >
-          <Text variant="bodySm" color="#32C96A" style={{ textAlign: 'center' }}>
+          <Text variant="bodySm" color="#237227" style={{ textAlign: 'center' }}>
             OTP verified · Photo uploaded · Ready for handover
           </Text>
         </View>

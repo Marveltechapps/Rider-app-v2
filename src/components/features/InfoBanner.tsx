@@ -29,7 +29,7 @@ export default function InfoBanner({ message, style }: InfoBannerProps) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    backgroundColor: 'rgba(50, 201, 106, 0.1)', // Exact Figma color
+    backgroundColor: 'rgba(35, 114, 39, 0.1)', // Exact Figma color
     borderRadius: scale(8),
     padding: scale(10.5), // Figma: padding: 10.5px
     justifyContent: 'center',
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     fontSize: scale(10),
     lineHeight: scale(14),
     fontWeight: '700',
-    color: Theme.colors.primaryMedium, // #32C96A
+    color: Theme.colors.primaryMedium, // #237227
     textAlign: 'center',
   },
 });

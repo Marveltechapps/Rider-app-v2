@@ -34,7 +34,7 @@ export default function LabeledInput({
   const inputBorderColor = error
     ? '#E53935'
     : isFocused
-    ? '#32C96A'
+    ? '#237227'
     : '#E5E7EB';
 
   const textColor = value ? '#717182' : '#B0B0B0';

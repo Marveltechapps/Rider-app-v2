@@ -31,9 +31,9 @@ export default function CashSummaryCard({
   const formattedLimit = `₹${limit.toLocaleString('en-IN', { maximumFractionDigits: 0 })} Limit`;
 
   // Progress bar color: green when under limit, red when over limit
-  const progressBarColor = exceedsLimit ? '#FB2C36' : '#32C96A';
+  const progressBarColor = exceedsLimit ? '#FB2C36' : '#237227';
   // Button color: green when under limit, red when over limit
-  const buttonColor = exceedsLimit ? '#FB2C36' : '#32C96A';
+  const buttonColor = exceedsLimit ? '#FB2C36' : '#237227';
 
   return (
     <View style={styles.card}>
@@ -45,7 +45,7 @@ export default function CashSummaryCard({
           </Text>
         </View>
         <View style={styles.iconContainer}>
-          <WalletStackIcon size={scale(17.5)} color="#32C96A" />
+          <WalletStackIcon size={scale(17.5)} color="#237227" />
         </View>
       </View>
 
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: scale(31.5),
     height: scale(31.5),
-    backgroundColor: 'rgba(50, 201, 106, 0.2)',
+    backgroundColor: 'rgba(35, 114, 39, 0.2)',
     borderRadius: scale(8.75),
     justifyContent: 'center',
     alignItems: 'center',

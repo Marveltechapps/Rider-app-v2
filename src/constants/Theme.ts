@@ -169,7 +169,7 @@ export const Theme = {
     },
     // Splash screen icon shadow
     iconGlow: {
-      shadowColor: '#32C96A',
+      shadowColor: '#237227',
       shadowOffset: { width: 0, height: 25 },
       shadowOpacity: 0.3,
       shadowRadius: 50,
@@ -177,7 +177,7 @@ export const Theme = {
     },
     // Login button shadow
     buttonPrimary: {
-      shadowColor: '#32C96A',
+      shadowColor: '#237227',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
       shadowRadius: 10,

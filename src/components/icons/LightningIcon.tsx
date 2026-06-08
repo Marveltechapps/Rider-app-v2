@@ -15,7 +15,7 @@ interface LightningIconProps {
 
 export default function LightningIcon({
   size = 16,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: LightningIconProps) {
   return (

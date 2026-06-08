@@ -32,7 +32,7 @@ export default function DocumentCard({
   const getDocumentIcon = () => {
     const name = document.name.toLowerCase();
     if (name.includes('aadhar')) {
-      return <DocumentAadharIcon size={scale(42)} color="#32C96A" />;
+      return <DocumentAadharIcon size={scale(42)} color="#237227" />;
     }
     if (name.includes('pan')) {
       return <DocumentPanIcon size={scale(42)} color="#99A1AF" />;
@@ -83,7 +83,7 @@ export default function DocumentCard({
         <Svg width={scale(10.5)} height={scale(10.5)} viewBox="0 0 10.5 10.5" fill="none">
           <Path
             d="M1.75 2.63L7.75 7.44"
-            stroke="#32C96A"
+            stroke="#237227"
             strokeWidth="0.875"
             strokeLinecap="round"
             strokeLinejoin="round"

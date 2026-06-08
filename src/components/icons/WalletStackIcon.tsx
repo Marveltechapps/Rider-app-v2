@@ -15,7 +15,7 @@ interface WalletStackIconProps {
 
 export default function WalletStackIcon({
   size = 18,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: WalletStackIconProps) {
   return (

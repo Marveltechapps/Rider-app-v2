@@ -1,423 +1,480 @@
 /**
- * Login Screen Component
- * Mobile login screen matching Figma design
- * 
- * @component
- * @example
- * <LoginScreen />
+ * Login Screen — Mobile / Email / WhatsApp tabs (Picker-style UI, Rider green theme)
  */
 
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Dimensions,
-  Keyboard,
-  Linking,
-  ScrollView,
+  View,
+  Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+  KeyboardAvoidingView,
+  Keyboard,
+  Pressable,
+  Platform,
+  useWindowDimensions,
+  ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { requestOtp, existingUserLogin } from '../api/auth';
-import { getLegalConfig, type LoginLegalConfig } from '../api/legal';
-import { sanitizePhoneDigits } from '../utils/profileValidation';
-import AppLogo from '../components/common/AppLogo';
-import Button from '../components/common/Button';
-import Text from '../components/common/Text';
-import ArrowRightIcon from '../components/icons/ArrowRightIcon';
-import BackIcon from '../components/icons/BackIcon';
-import { useUser } from '../contexts';
-import { Theme } from '../constants/Theme';
-import { scale, verticalScale } from '../utils/responsive';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import AuthHeader from '@/components/auth/AuthHeader';
+import LoginMethodTabs from '@/components/auth/LoginMethodTabs';
+import PhoneInputRow from '@/components/auth/PhoneInputRow';
+import ConsentCheckbox from '@/components/auth/ConsentCheckbox';
+import CountryPickerModal from '@/components/auth/CountryPickerModal';
+import PolicyModal from '@/components/auth/PolicyModal';
+import Button from '@/components/common/Button';
+import { useAuthScreenTheme } from '@/hooks/useAuthScreenTheme';
+import {
+  COUNTRY_LIST,
+  DEFAULT_COUNTRY_CODE,
+  findCountryByCode,
+  findCountryByDialCode,
+  type CountryOption,
+} from '@/lib/countries';
+import {
+  formatNationalAsYouType,
+  stripDigits,
+  truncatePhoneForCountry,
+  validatePhone,
+} from '@/lib/phoneValidation';
+import {
+  sendLoginOtp,
+  validateEmailFormat,
+  isCompleteEmail,
+  type LoginMode,
+} from '@/services/auth.service';
+import { savePendingOtpSession } from '@/utils/pendingOtpSession';
+import { useUser } from '@/contexts';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+function resolveRouteParam(value: string | string[] | undefined): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value[0]) return value[0];
+  return '';
+}
+
+function parseLoginMode(value: string): LoginMode | null {
+  if (value === 'email' || value === 'whatsapp' || value === 'mobile') return value;
+  return null;
+}
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { authLoaded, isLoggedIn, setAuthFromVerify, updateUserData, userData } = useUser();
-  const phoneInputRef = useRef<TextInput>(null);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [countryCode] = useState('+91');
-  const [checkingExisting, setCheckingExisting] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [loginLegal, setLoginLegal] = useState<LoginLegalConfig | null>(null);
+  const params = useLocalSearchParams<{
+    loginMode?: string | string[];
+    email?: string | string[];
+    phone?: string | string[];
+    countryCode?: string | string[];
+  }>();
+  const theme = useAuthScreenTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const { beginFreshLoginSession } = useUser();
 
-  useEffect(() => {
-    let active = true;
-    getLegalConfig()
-      .then((config) => {
-        if (active) setLoginLegal(config);
-      })
-      .catch(() => {
-        if (active) setLoginLegal(null);
-      });
-    return () => {
-      active = false;
-    };
+  const initialMode = parseLoginMode(resolveRouteParam(params.loginMode)) ?? 'mobile';
+  const initialEmail = resolveRouteParam(params.email);
+  const initialPhone = stripDigits(resolveRouteParam(params.phone));
+  const initialCountry =
+    findCountryByDialCode(resolveRouteParam(params.countryCode)) ??
+    findCountryByCode(DEFAULT_COUNTRY_CODE) ??
+    COUNTRY_LIST[0];
+
+  const [loginMode, setLoginMode] = useState<LoginMode>(initialMode);
+  const [country, setCountry] = useState<CountryOption>(initialCountry);
+  const [phoneDigits, setPhoneDigits] = useState(initialPhone);
+  const [email, setEmail] = useState(initialEmail);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [phoneFocused, setPhoneFocused] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+  const [policyModal, setPolicyModal] = useState<'terms' | 'privacy' | null>(null);
+  const emailInputRef = useRef<TextInput>(null);
+  const phoneInputRef = useRef<TextInput>(null);
+
+  const dismissKeyboard = useCallback(() => {
+    emailInputRef.current?.blur();
+    phoneInputRef.current?.blur();
+    Keyboard.dismiss();
   }, []);
 
-  const handleTermsPress = () => {
-    const terms = loginLegal?.terms;
-    if (terms?.type === 'url' && terms.url) {
-      Linking.openURL(terms.url).catch(() => {});
-      return;
-    }
-    router.push({ pathname: '/terms-conditions', params: { returnTo: '/login' } });
-  };
+  React.useEffect(() => {
+    dismissKeyboard();
+  }, [dismissKeyboard]);
 
-  const handlePrivacyPress = () => {
-    const privacy = loginLegal?.privacy;
-    if (privacy?.type === 'url' && privacy.url) {
-      Linking.openURL(privacy.url).catch(() => {});
-      return;
-    }
-    router.push({ pathname: '/privacy-policy', params: { returnTo: '/login' } });
-  };
+  React.useEffect(() => {
+    const mode = parseLoginMode(resolveRouteParam(params.loginMode));
+    if (mode) setLoginMode(mode);
 
-  // Redirection is handled by AuthGuard in app/_layout.tsx
+    const paramEmail = resolveRouteParam(params.email);
+    if (paramEmail) setEmail(paramEmail);
+
+    const paramPhone = stripDigits(resolveRouteParam(params.phone));
+    if (paramPhone) setPhoneDigits(paramPhone);
+
+    const dial = resolveRouteParam(params.countryCode);
+    if (dial) {
+      const nextCountry = findCountryByDialCode(dial);
+      if (nextCountry) setCountry(nextCountry);
+    }
+
+    if (mode || paramEmail || paramPhone || dial) {
+      setFieldError(null);
+    }
+  }, [params.loginMode, params.email, params.phone, params.countryCode]);
+
+  const contentWidth = useMemo(
+    () => Math.min(Math.max(screenWidth - 32, 320), 420),
+    [screenWidth]
+  );
+
+  const formattedPhone = useMemo(
+    () => formatNationalAsYouType(phoneDigits, country.code),
+    [phoneDigits, country.code]
+  );
+
+  const phoneValidation = useMemo(() => {
+    if (loginMode === 'email') return null;
+    return validatePhone(
+      phoneDigits,
+      country.code,
+      loginMode === 'whatsapp' ? 'whatsapp' : 'mobile'
+    );
+  }, [loginMode, phoneDigits, country.code]);
+
+  const emailValid = useMemo(() => isCompleteEmail(email), [email]);
+
+  const canSendOtp = useMemo(() => {
+    if (loading || !consentChecked) return false;
+    if (loginMode === 'email') return emailValid;
+    return !!phoneDigits && (phoneValidation?.valid ?? false);
+  }, [loading, consentChecked, loginMode, emailValid, phoneDigits, phoneValidation]);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: theme.colors.pageBg,
+        },
+        formCard: {
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radius.xl,
+          padding: theme.spacing.lg,
+          borderWidth: 1,
+          borderColor: theme.colors.primaryMuted,
+        },
+        scroll: { flex: 1 },
+        scrollContent: {
+          flexGrow: 1,
+          paddingHorizontal: theme.layout.contentPaddingH,
+          paddingBottom: theme.spacing['2xl'],
+        },
+        content: {
+          paddingTop: theme.spacing['2xl'],
+        },
+        methodLabel: {
+          fontSize: theme.typography.fontSize.md,
+          color: theme.colors.mutedText,
+          marginBottom: theme.spacing.sm,
+        },
+        fieldSection: {
+          marginTop: theme.spacing.lg,
+          marginBottom: theme.spacing.lg,
+        },
+        fieldLabel: {
+          fontSize: theme.typography.fontSize.md,
+          color: theme.colors.textPrimary,
+          marginBottom: theme.spacing.sm,
+          fontWeight: theme.typography.fontWeight.bold,
+        },
+        emailInput: {
+          borderWidth: 1,
+          borderColor: theme.colors.inputBorder,
+          borderRadius: theme.radius.lg,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.md + 2,
+          fontSize: theme.typography.fontSize.lg,
+          color: theme.colors.textPrimary,
+          backgroundColor: theme.colors.inputBg,
+        },
+        inputFocus: {
+          borderColor: theme.colors.inputFocus,
+          borderWidth: 2,
+        },
+        inputError: {
+          borderColor: theme.colors.inputBorderError,
+          borderWidth: 2,
+        },
+        errorText: {
+          marginTop: theme.spacing.sm,
+          fontSize: theme.typography.fontSize.sm,
+          color: theme.colors.inputBorderError,
+        },
+        consentSection: {
+          marginBottom: theme.spacing.lg,
+        },
+        buttonContainer: {
+          marginBottom: theme.spacing.md,
+        },
+      }),
+    [theme]
+  );
+
+  const handleLoginModeChange = (mode: LoginMode) => {
+    dismissKeyboard();
+    setLoginMode(mode);
+    setFieldError(null);
+  };
 
   const handlePhoneChange = (text: string) => {
-    setPhoneNumber(sanitizePhoneDigits(text));
-    if (otpError) setOtpError(null);
+    const digits = truncatePhoneForCountry(stripDigits(text), country.code);
+    setPhoneDigits(digits);
+    if (fieldError) setFieldError(null);
+    const validation = validatePhone(
+      digits,
+      country.code,
+      loginMode === 'whatsapp' ? 'whatsapp' : 'mobile'
+    );
+    if (validation.valid) {
+      phoneInputRef.current?.blur();
+      Keyboard.dismiss();
+    }
   };
 
-  const handleContinue = async () => {
-    if (!isPhoneValid) return;
-    const fullPhoneNumber = `${countryCode} ${phoneNumber}`;
-    setOtpError(null);
-    setSendingOtp(true);
-    try {
-      const existing = await existingUserLogin(fullPhoneNumber);
-      if (existing.canSkipOtp && existing.token && existing.riderId) {
-        const { setStoredTokens, getStoredAccessToken } = await import('../api/storage');
-        await setStoredTokens(existing.token, existing.token, existing.riderId);
-        for (let i = 0; i < 20; i++) {
-          const stored = await getStoredAccessToken();
-          if (stored) break;
-          await new Promise((r) => setTimeout(r, 50));
-        }
-        setAuthFromVerify({
-          riderId: existing.riderId,
-          name: existing.name ?? undefined,
-          phoneNumber: existing.phoneNumber ?? fullPhoneNumber,
-          onboardingComplete: !!existing.onboardingComplete,
-        });
-        if (existing.onboardingComplete) {
-          router.replace('/(tabs)');
-        } else {
-          router.replace('/search-location');
-        }
+  const handleCountrySelect = (next: CountryOption) => {
+    dismissKeyboard();
+    setCountry(next);
+    setPhoneDigits((prev) => truncatePhoneForCountry(prev, next.code));
+    setFieldError(null);
+  };
+
+  const handleEmailChange = (text: string) => {
+    const cleaned = text.replace(/\s/g, '');
+    setEmail(cleaned);
+    if (fieldError) setFieldError(null);
+  };
+
+  const handleSendOTP = async () => {
+    if (!consentChecked) return;
+
+    if (loginMode === 'email') {
+      const trimmed = email.trim();
+      if (!trimmed) {
+        setFieldError('Enter email address');
         return;
       }
-      await requestOtp(fullPhoneNumber);
-      router.push({
-        pathname: '/otp',
-        params: { phoneNumber: fullPhoneNumber },
+      if (!validateEmailFormat(trimmed)) {
+        setFieldError('Please enter a valid email address');
+        return;
+      }
+      if (!isCompleteEmail(trimmed)) {
+        setFieldError('Please enter a complete email address');
+        return;
+      }
+    } else {
+      if (!phoneDigits) {
+        setFieldError(
+          loginMode === 'whatsapp' ? 'Enter WhatsApp number' : 'Enter mobile number'
+        );
+        return;
+      }
+      if (!phoneValidation?.valid) {
+        setFieldError(phoneValidation?.message ?? 'Invalid number format');
+        return;
+      }
+    }
+
+    dismissKeyboard();
+    setLoading(true);
+    setFieldError(null);
+
+    try {
+      await beginFreshLoginSession();
+
+      const result = await sendLoginOtp({
+        loginMode,
+        countryCode: country.dialCode,
+        phone: phoneDigits,
+        email: email.trim().toLowerCase(),
       });
+
+      if (result.success) {
+        const otpTarget = loginMode === 'email' ? 'email' : 'phone';
+        const normalizedEmail = email.trim().toLowerCase();
+        const displayTarget =
+          loginMode === 'email'
+            ? normalizedEmail
+            : `${country.dialCode} ${phoneDigits}`;
+        const channel =
+          result.channel ??
+          (loginMode === 'whatsapp' ? 'whatsapp' : loginMode === 'email' ? 'email' : 'sms');
+
+        if (loginMode === 'whatsapp' && channel.toLowerCase().includes('sms')) {
+          // Inform user when WhatsApp falls back to SMS
+          console.info('[Login] WhatsApp OTP delivered via SMS fallback');
+        }
+
+        const otpSession = {
+          loginMode,
+          otpTarget,
+          countryCode: country.dialCode,
+          phone: phoneDigits,
+          email: normalizedEmail,
+          channel,
+          displayTarget,
+        };
+        try {
+          await savePendingOtpSession(otpSession);
+        } catch {
+          /* memory + route params carry the session */
+        }
+
+        router.push({
+          pathname: '/otp',
+          params: {
+            loginMode: otpSession.loginMode,
+            otpTarget: otpSession.otpTarget,
+            countryCode: otpSession.countryCode ?? '',
+            phone: otpSession.phone ?? '',
+            email: otpSession.email ?? '',
+            channel: otpSession.channel ?? '',
+            displayTarget: otpSession.displayTarget ?? '',
+          },
+        });
+      } else {
+        setFieldError(result.error || result.message || 'Failed to send OTP. Please try again.');
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to send OTP';
-      setOtpError(message);
+      const message = err instanceof Error ? err.message : 'Failed to send OTP. Please try again.';
+      setFieldError(message);
     } finally {
-      setSendingOtp(false);
+      setLoading(false);
     }
   };
 
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    }
-  };
-
-  const isPhoneValid = /^[6-9]\d{9}$/.test(phoneNumber);
+  const phoneLabel = loginMode === 'whatsapp' ? 'WhatsApp Number' : 'Mobile Number';
+  const showPhoneInvalid = !!(phoneValidation?.showInvalid && fieldError === null && !phoneValidation.valid);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.mainContainer}>
-        {/* Scrollable Content */}
+    <Pressable style={styles.container} onPress={dismissKeyboard} accessible={false}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <AuthHeader />
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            <View style={styles.content}>
-              {/* Header Section */}
-              <View style={styles.header}>
-                {/* Back Button */}
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={handleBack}
-                  activeOpacity={0.7}
-                >
-                  <BackIcon size={scale(42)} />
-                </TouchableOpacity>
+          <View style={[styles.content, { width: contentWidth, alignSelf: 'center' }]}>
+            <View style={styles.formCard}>
+              <Text style={styles.methodLabel}>Choose login method</Text>
+              <LoginMethodTabs value={loginMode} onChange={handleLoginModeChange} />
 
-                {/* App Icon */}
-                <View style={styles.iconContainer}>
-                  <AppLogo size={scale(72)} />
-                </View>
+              <View style={styles.fieldSection}>
+                {loginMode === 'email' ? (
+                  <View>
+                    <Text style={styles.fieldLabel}>Email Address</Text>
+                    <TextInput
+                      ref={emailInputRef}
+                      style={[
+                        styles.emailInput,
+                        (emailFocused || email.length > 0) && !fieldError && styles.inputFocus,
+                        fieldError && loginMode === 'email' && styles.inputError,
+                      ]}
+                      placeholder="rider@example.com"
+                      placeholderTextColor={theme.colors.placeholder}
+                      value={email}
+                      onChangeText={handleEmailChange}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      blurOnSubmit={false}
+                      autoComplete="off"
+                      textContentType="none"
+                      importantForAutofill="no"
+                      onFocus={() => setEmailFocused(true)}
+                      onBlur={() => setEmailFocused(false)}
+                      onSubmitEditing={() => {
+                        if (isCompleteEmail(email)) dismissKeyboard();
+                      }}
+                    />
+                  </View>
+                ) : (
+                  <PhoneInputRow
+                    country={country}
+                    value={formattedPhone}
+                    onChangeText={handlePhoneChange}
+                    onCountryPress={() => {
+                      dismissKeyboard();
+                      setCountryPickerVisible(true);
+                    }}
+                    hasError={!!fieldError || showPhoneInvalid}
+                    isFocused={phoneFocused}
+                    hasInput={phoneDigits.length > 0}
+                    label={phoneLabel}
+                    inputRef={phoneInputRef}
+                    onFocus={() => setPhoneFocused(true)}
+                    onBlur={() => setPhoneFocused(false)}
+                    onSubmitEditing={dismissKeyboard}
+                  />
+                )}
 
-                {/* Title */}
-                <Text variant="loginTitle" color={Theme.colors.textDark} style={styles.title}>
-                  Welcome to QuickRider
-                </Text>
-
-                {/* Subtitle */}
-                <Text variant="loginSubtitle" color={Theme.colors.textGrey} style={styles.subtitle}>
-                  Enter your mobile number to get started
-                </Text>
+                {fieldError ? <Text style={styles.errorText}>{fieldError}</Text> : null}
+                {showPhoneInvalid && phoneValidation?.message ? (
+                  <Text style={styles.errorText}>{phoneValidation.message}</Text>
+                ) : null}
               </View>
 
-              {/* Form Section */}
-              <View style={styles.formSection}>
-                {/* Mobile Number Input */}
-                <View style={styles.inputGroup}>
-                  <Text variant="loginLabel" color={Theme.colors.textLabel} style={styles.label}>
-                    Mobile Number
-                  </Text>
+              <View style={styles.consentSection}>
+                <ConsentCheckbox
+                  checked={consentChecked}
+                  onToggle={() => {
+                    dismissKeyboard();
+                    setConsentChecked((v) => !v);
+                  }}
+                  onTermsPress={() => {
+                    dismissKeyboard();
+                    setPolicyModal('terms');
+                  }}
+                  onPrivacyPress={() => {
+                    dismissKeyboard();
+                    setPolicyModal('privacy');
+                  }}
+                />
+              </View>
 
-                  <View style={styles.phoneInputContainer} pointerEvents="box-none">
-                    {/* Country Code */}
-                    <View style={styles.countryCodeContainer}>
-                      <Text style={styles.countryCodeText}>
-                        {countryCode}
-                      </Text>
-                    </View>
-
-                    {/* Tap wrapper focuses input so keyboard opens on native (Expo Go) */}
-                    <TouchableWithoutFeedback
-                      onPress={() => {
-                        phoneInputRef.current?.focus();
-                      }}
-                      accessible={false}
-                    >
-                      <View style={styles.phoneInputWrapper} collapsable={false}>
-                        <TextInput
-                          ref={phoneInputRef}
-                          style={styles.phoneInputText}
-                          value={phoneNumber}
-                          onChangeText={handlePhoneChange}
-                          placeholder="98765 43210"
-                          placeholderTextColor={Theme.colors.textLight}
-                          keyboardType="phone-pad"
-                          maxLength={10}
-                          editable={true}
-                          caretHidden={false}
-                          importantForAutofill="no"
-                          blurOnSubmit={false}
-                        />
-                      </View>
-                    </TouchableWithoutFeedback>
-                  </View>
-
-                  {/* Info Box */}
-                  <View style={styles.infoBoxContainer}>
-                    <View style={styles.infoBox}>
-                      <View style={styles.infoTextContainer}>
-                        <Text
-                          variant="loginInfo"
-                          color="#32C96A"
-                          style={styles.infoText}
-                        >
-                          🔒 We'll send you an OTP to verify your number
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
+              <View style={styles.buttonContainer}>
+                <Button
+                  title="Send OTP"
+                  onPress={handleSendOTP}
+                  disabled={!canSendOtp}
+                  loading={loading}
+                  variant="primary"
+                />
               </View>
             </View>
-          </TouchableWithoutFeedback>
+          </View>
         </ScrollView>
 
-        {/* Fixed Bottom Section */}
-        <View style={styles.bottomSection}>
-          {otpError ? (
-            <Text variant="loginSubtitle" style={[styles.otpErrorText, { color: '#C53030' }]}>
-              {otpError}
-            </Text>
-          ) : null}
-          {/* Continue Button */}
-          <Button
-            title="Continue"
-            onPress={handleContinue}
-            variant="primary"
-            size="medium"
-            disabled={!isPhoneValid || checkingExisting || sendingOtp}
-            loading={checkingExisting || sendingOtp}
-            icon={<ArrowRightIcon size={scale(14)} color="#FFFFFF" />}
-            iconPosition="right"
-            style={styles.continueButton}
-          />
+        <CountryPickerModal
+          visible={countryPickerVisible}
+          selectedCode={country.code}
+          onSelect={handleCountrySelect}
+          onClose={() => setCountryPickerVisible(false)}
+        />
 
-          {/* Terms Text */}
-          <Text variant="loginTerms" color={Theme.colors.textLight} style={styles.termsText}>
-            {loginLegal?.preamble ?? 'By continuing, you agree to our '}
-            <Text variant="loginTerms" style={styles.termsLink} onPress={handleTermsPress}>
-              {loginLegal?.terms?.label ?? 'Terms & Conditions'}
-            </Text>
-            {loginLegal?.connector ?? ' and '}
-            <Text variant="loginTerms" style={styles.termsLink} onPress={handlePrivacyPress}>
-              {loginLegal?.privacy?.label ?? 'Privacy Policy'}
-            </Text>
-          </Text>
-        </View>
-      </View>
-    </SafeAreaView>
+        <PolicyModal
+          visible={policyModal !== null}
+          type={policyModal ?? 'terms'}
+          onClose={() => setPolicyModal(null)}
+        />
+      </KeyboardAvoidingView>
+    </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Theme.colors.backgroundLight,
-  },
-  mainContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: scale(21),
-    paddingTop: verticalScale(21),
-  },
-  content: {
-    width: '100%',
-    maxWidth: scale(360),
-    alignSelf: 'center',
-  },
-  header: {
-    marginBottom: verticalScale(28),
-  },
-  backButton: {
-    width: scale(42),
-    height: scale(42),
-    backgroundColor: Theme.colors.white,
-    borderWidth: 1,
-    borderColor: Theme.colors.borderGrey,
-    borderRadius: Theme.borderRadius.round,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: verticalScale(28),
-    // Figma shadow: 0px 1px 2px -1px rgba(0, 0, 0, 0.1), 0px 1px 3px 0px rgba(0, 0, 0, 0.1)
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1.5,
-    elevation: 2,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    marginBottom: verticalScale(42),
-  },
-  title: {
-    marginBottom: verticalScale(10.5),
-  },
-  subtitle: {
-    // Subtitle styles
-  },
-  formSection: {
-    width: '100%',
-  },
-  inputGroup: {
-    marginBottom: verticalScale(21),
-  },
-  label: {
-    marginBottom: verticalScale(10.5),
-  },
-  phoneInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(10.5),
-    marginBottom: verticalScale(10.5),
-  },
-  countryCodeContainer: {
-    width: scale(60),
-    height: scale(44),
-    backgroundColor: Theme.colors.white,
-    borderWidth: 1,
-    borderColor: Theme.colors.borderGrey,
-    borderRadius: Theme.borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Theme.shadows.small,
-  },
-  countryCodeText: {
-    fontSize: 14,
-    fontFamily: Theme.typography.loginInput.fontFamily,
-    lineHeight: 14 * 1.5,
-    color: Theme.colors.textDark,
-  },
-  phoneInputWrapper: {
-    flex: 1,
-    height: scale(44),
-    backgroundColor: Theme.colors.white,
-    borderWidth: 1,
-    borderColor: Theme.colors.borderGrey,
-    borderRadius: Theme.borderRadius.lg,
-    paddingHorizontal: Theme.spacing.md,
-    justifyContent: 'center',
-    ...Theme.shadows.small,
-  },
-  phoneInputText: {
-    height: scale(44),
-    paddingVertical: 0,
-    fontSize: 14,
-    fontFamily: Theme.typography.loginInput.fontFamily,
-    lineHeight: 14 * 1.5,
-    color: Theme.colors.textDark,
-  },
-  infoBoxContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  infoBox: {
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(50, 201, 106, 0.2)',
-    borderRadius: scale(14),
-    paddingHorizontal: scale(15),
-    paddingTop: scale(1),
-    paddingBottom: scale(1),
-    height: scale(47.5),
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-  },
-  infoTextContainer: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoText: {
-    textAlign: 'center',
-    width: '100%',
-  },
-  bottomSection: {
-    paddingHorizontal: scale(21),
-    paddingTop: verticalScale(28),
-    paddingBottom: verticalScale(21),
-    backgroundColor: Theme.colors.backgroundLight,
-    gap: verticalScale(21),
-  },
-  otpErrorText: {
-    marginBottom: verticalScale(4),
-    textAlign: 'center',
-  },
-  continueButton: {
-    ...Theme.shadows.buttonPrimary,
-  },
-  termsText: {
-    textAlign: 'center',
-  },
-  termsLink: {
-    color: Theme.colors.primary,
-    textDecorationLine: 'underline',
-  },
-});
-

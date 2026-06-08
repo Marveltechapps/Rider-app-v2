@@ -16,7 +16,7 @@ interface DispatchBayIconProps {
 
 export default function DispatchBayIcon({
   size = 14,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: DispatchBayIconProps) {
   return (

@@ -15,7 +15,7 @@ interface LoadingSpinnerIconProps {
 
 export default function LoadingSpinnerIcon({
   size = 68.28,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: LoadingSpinnerIconProps) {
   const scaleFactor = size / 84; // Scale from 84x84 viewBox to desired size

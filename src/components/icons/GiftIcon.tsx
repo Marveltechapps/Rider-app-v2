@@ -16,7 +16,7 @@ interface GiftIconProps {
 
 export default function GiftIcon({
   size = 18,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: GiftIconProps) {
   return (

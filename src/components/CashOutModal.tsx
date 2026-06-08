@@ -72,7 +72,7 @@ export default function CashOutModal({
                 <Text variant="bodySm" color="#6A7282" style={styles.amountLabel}>
                   Amount to withdraw
                 </Text>
-                <Text variant="h1" color="#32C96A" style={styles.amount}>
+                <Text variant="h1" color="#237227" style={styles.amount}>
                   ₹{amount}
                 </Text>
               </View>
@@ -97,7 +97,7 @@ export default function CashOutModal({
                     </View>
                   </View>
                   <View style={styles.verifiedPill}>
-                    <Text variant="caption" color="#32C96A" style={styles.verifiedText}>
+                    <Text variant="caption" color="#237227" style={styles.verifiedText}>
                       Primary
                     </Text>
                   </View>
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     fontSize: scale(36),
     fontWeight: '700',
     lineHeight: scale(44),
-    color: '#32C96A',
+    color: '#237227',
   },
   paymentSection: {
     marginBottom: verticalScale(16),
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     width: scale(36),
     height: scale(36),
     borderRadius: scale(18),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -284,14 +284,14 @@ const styles = StyleSheet.create({
   verifiedPill: {
     paddingVertical: verticalScale(4),
     paddingHorizontal: scale(10),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderRadius: scale(12),
   },
   verifiedText: {
     fontSize: scale(10),
     fontWeight: '700',
     lineHeight: scale(14),
-    color: '#32C96A',
+    color: '#237227',
   },
   infoCard: {
     flexDirection: 'row',
@@ -344,9 +344,9 @@ const styles = StyleSheet.create({
     gap: scale(10),
     paddingVertical: verticalScale(14),
     paddingHorizontal: scale(24),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: scale(12),
-    shadowColor: '#32C96A',
+    shadowColor: '#237227',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 10,

@@ -34,7 +34,7 @@ const verifyHubItemsStyles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: scale(9999),
   },
   progressText: {
@@ -78,8 +78,8 @@ const verifyHubItemsStyles = StyleSheet.create({
     alignItems: 'center',
   },
   checkboxChecked: {
-    borderColor: '#32C96A',
-    backgroundColor: '#32C96A',
+    borderColor: '#237227',
+    backgroundColor: '#237227',
   },
   itemName: {
     flex: 1,
@@ -120,7 +120,7 @@ const verifyHubItemsStyles = StyleSheet.create({
   bottomButton: {
     width: '100%',
     height: scale(56),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: scale(9999),
     flexDirection: 'row',
     alignItems: 'center',

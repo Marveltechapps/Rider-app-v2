@@ -164,7 +164,7 @@ export default function HistoryScreen() {
             onPress={handleDatePress}
             activeOpacity={0.7}
           >
-            <CalendarIcon size={scale(14)} color="#32C96A" />
+            <CalendarIcon size={scale(14)} color="#237227" />
             <Text variant="body" color="#101828" style={historyStyles.dateCenterText}>
               {formatDate(selectedDate)}
             </Text>
@@ -183,7 +183,7 @@ export default function HistoryScreen() {
       {/* Stats Row */}
       <View style={historyStyles.statsRow}>
         <View style={historyStyles.statCard}>
-          <Text variant="h3" color="#32C96A" style={historyStyles.statValue}>
+          <Text variant="h3" color="#237227" style={historyStyles.statValue}>
             {stats.totalOrders}
           </Text>
           <Text variant="caption" color="#6A7282" style={historyStyles.statLabel}>
@@ -191,7 +191,7 @@ export default function HistoryScreen() {
           </Text>
         </View>
         <View style={historyStyles.statCard}>
-          <Text variant="h3" color="#32C96A" style={historyStyles.statValue}>
+          <Text variant="h3" color="#237227" style={historyStyles.statValue}>
             ₹{stats.totalEarnings}
           </Text>
           <Text variant="caption" color="#6A7282" style={historyStyles.statLabel}>
@@ -199,7 +199,7 @@ export default function HistoryScreen() {
           </Text>
         </View>
         <View style={historyStyles.statCard}>
-          <Text variant="h3" color="#32C96A" style={historyStyles.statValue}>
+          <Text variant="h3" color="#237227" style={historyStyles.statValue}>
             {stats.avgRating}
           </Text>
           <Text variant="caption" color="#6A7282" style={historyStyles.statLabel}>

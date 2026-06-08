@@ -198,7 +198,7 @@ export default function KYCUploadScreen() {
   const getStatusColor = (status: DocumentStatus): string => {
     switch (status) {
       case 'verified':
-        return 'rgba(50, 201, 106, 0.1)'; // Light green
+        return 'rgba(35, 114, 39, 0.1)'; // Light green
       case 'failed':
         return 'rgba(251, 44, 54, 0.1)'; // Light red
       case 'pending':
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   viewDocButton: {
     paddingHorizontal: scale(10),
     paddingVertical: scale(4),
-    backgroundColor: 'rgba(50, 201, 106, 0.15)',
+    backgroundColor: 'rgba(35, 114, 39, 0.15)',
     borderRadius: 8,
   },
   viewDocText: {

@@ -15,7 +15,7 @@ interface ArrowUpRightIconProps {
 
 export default function ArrowUpRightIcon({
   size = 8,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: ArrowUpRightIconProps) {
   return (

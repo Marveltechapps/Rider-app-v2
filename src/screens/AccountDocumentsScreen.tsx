@@ -80,7 +80,7 @@ export default function AccountDocumentsScreen() {
             >
               <View style={paymentIssuesStyles.topicCardLeft}>
                 <View style={paymentIssuesStyles.topicIconContainer}>
-                  <DocumentIcon size={scale(24)} color="#32C96A" />
+                  <DocumentIcon size={scale(24)} color="#237227" />
                 </View>
                 <View style={paymentIssuesStyles.topicInfo}>
                   <Text variant="body" color="#101828" style={paymentIssuesStyles.topicTitle}>

@@ -16,7 +16,7 @@ interface LocationPinIconProps {
 
 export default function LocationPinIcon({ 
   size = 21, 
-  color = '#32C96A',
+  color = '#237227',
   style 
 }: LocationPinIconProps) {
   const scale = size / 21; // Scale factor for different sizes

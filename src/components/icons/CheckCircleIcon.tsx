@@ -16,7 +16,7 @@ interface CheckCircleIconProps {
 
 export default function CheckCircleIcon({
   size = 18,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: CheckCircleIconProps) {
   return (

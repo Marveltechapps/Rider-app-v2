@@ -176,10 +176,10 @@ export default function DepositCashScreen() {
               onPress={() => setSelectedMethod('upi')}
             >
               <View style={styles.methodIconContainer}>
-                <UPIIcon size={scale(24.5)} color="#32C96A" />
+                <UPIIcon size={scale(24.5)} color="#237227" />
                 {selectedMethod === 'upi' && (
                   <View style={styles.arrowIconContainer}>
-                    <ArrowUpRightIcon size={scale(7.29)} color="#32C96A" />
+                    <ArrowUpRightIcon size={scale(7.29)} color="#237227" />
                   </View>
                 )}
               </View>
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   methodCardSelected: {
-    backgroundColor: 'rgba(50, 201, 106, 0.05)',
+    backgroundColor: 'rgba(35, 114, 39, 0.05)',
     borderColor: Theme.colors.primaryMedium,
     ...Theme.shadows.small,
   },

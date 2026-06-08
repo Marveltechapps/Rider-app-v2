@@ -30,7 +30,7 @@ interface CashHistoryItemProps {
 
 export default function CashHistoryItem({ transaction, onPress }: CashHistoryItemProps) {
   const isCollected = transaction.type === 'collected';
-  const amountColor = isCollected ? '#F54900' : '#32C96A';
+  const amountColor = isCollected ? '#F54900' : '#237227';
   const amountPrefix = isCollected ? '+' : '-';
   const formattedAmount = `${amountPrefix} ₹${transaction.amount.toLocaleString('en-IN')}`;
   const iconBgColor = isCollected ? '#FFF7ED' : '#F0FDF4';
@@ -47,7 +47,7 @@ export default function CashHistoryItem({ transaction, onPress }: CashHistoryIte
           {isCollected ? (
             <CashCollectedIcon size={scale(17.5)} color="#F54900" />
           ) : (
-            <CashDepositedIcon size={scale(17.5)} color="#32C96A" />
+            <CashDepositedIcon size={scale(17.5)} color="#237227" />
           )}
         </View>
 
@@ -76,7 +76,7 @@ export default function CashHistoryItem({ transaction, onPress }: CashHistoryIte
           </Text>
           {transaction.status === 'SUCCESS' && (
             <View style={styles.statusBadge}>
-              <Text variant="caption" color="#32C96A" style={styles.statusText}>
+              <Text variant="caption" color="#237227" style={styles.statusText}>
                 SUCCESS
               </Text>
             </View>
@@ -146,9 +146,9 @@ const styles = StyleSheet.create({
   statusBadge: {
     paddingVertical: scale(2),
     paddingHorizontal: scale(4),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderWidth: 1,
-    borderColor: '#32C96A',
+    borderColor: '#237227',
     borderRadius: scale(4),
   },
   statusText: {

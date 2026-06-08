@@ -28,14 +28,14 @@ export default function CheckmarkSmallGreenIcon({
       <G clipPath="url(#clip0_13476_96)">
         <Path
           d="M5.5 10.0833C8.03131 10.0833 10.0833 8.03131 10.0833 5.5C10.0833 2.96869 8.03131 0.916667 5.5 0.916667C2.96869 0.916667 0.916667 2.96869 0.916667 5.5C0.916667 8.03131 2.96869 10.0833 5.5 10.0833Z"
-          stroke="#32C96A"
+          stroke="#237227"
           strokeWidth="0.875"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         <Path
           d="M4.125 5.5L5.04167 6.41667L6.875 4.58333"
-          stroke="#32C96A"
+          stroke="#237227"
           strokeWidth="0.875"
           strokeLinecap="round"
           strokeLinejoin="round"

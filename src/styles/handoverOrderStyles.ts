@@ -39,7 +39,7 @@ const handoverOrderStyles = StyleSheet.create({
   customerAvatarContainer: {
     width: scale(56),
     height: scale(56),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderRadius: scale(14),
     justifyContent: 'center',
     alignItems: 'center',
@@ -74,7 +74,7 @@ const handoverOrderStyles = StyleSheet.create({
     borderRadius: scale(21),
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#32C96A',
+    shadowColor: '#237227',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -308,7 +308,7 @@ const handoverOrderStyles = StyleSheet.create({
     backgroundColor: '#FFEDD4',
   },
   paymentStatusBadgePaid: {
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
   },
   paymentStatusText: {
     fontSize: scale(12),
@@ -321,7 +321,7 @@ const handoverOrderStyles = StyleSheet.create({
     color: '#F54900',
   },
   paymentStatusTextPaid: {
-    color: '#32C96A',
+    color: '#237227',
   },
   paymentButtonsRow: {
     flexDirection: 'row',
@@ -407,7 +407,7 @@ const handoverOrderStyles = StyleSheet.create({
     gap: scale(8),
     paddingVertical: 0,
     paddingHorizontal: scale(10.5),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderRadius: scale(9999),
     height: scale(21),
   },
@@ -415,7 +415,7 @@ const handoverOrderStyles = StyleSheet.create({
     width: scale(7),
     height: scale(7),
     borderRadius: scale(3.5),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
   },
   paymentPrepaidStatusText: {
     fontSize: scale(12),
@@ -423,7 +423,7 @@ const handoverOrderStyles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: scale(0.25),
-    color: '#32C96A',
+    color: '#237227',
   },
   deliveryProofSection: {
     gap: scale(8),

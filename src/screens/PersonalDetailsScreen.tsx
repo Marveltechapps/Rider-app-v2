@@ -1,6 +1,6 @@
 /**
  * Personal Details Screen Component
- * User enters name, email, and verifies phone number
+ * User enters name and email (phone is already set at OTP login)
  * 
  * @component
  * @example
@@ -32,6 +32,22 @@ import { goBackOrReplace, resolvePersonalDetailsFallback } from '../utils/naviga
 import { scale, verticalScale } from '../utils/responsive';
 import { updateRider } from '../api/rider';
 
+import { isSyntheticRiderPhone } from '@/utils/loginContact';
+
+function resolvePersonalDetailsEmail(userData: {
+  loginMethod?: string | null;
+  loginContact?: string;
+  email?: string;
+}): string {
+  if (userData.loginMethod === 'email' && userData.loginContact) {
+    return userData.loginContact;
+  }
+  if (userData.loginMethod === 'email' && userData.email) {
+    return userData.email;
+  }
+  return userData.email || '';
+}
+
 export default function PersonalDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -49,9 +65,12 @@ export default function PersonalDetailsScreen() {
   const isDefaultName = (name: string) => /^Rider\s+\d{4}$/.test(name);
   
   const [name, setName] = useState(isDefaultName(userData.name) ? '' : (userData.name || ''));
-  const [email, setEmail] = useState(userData.email || '');
+  const [email, setEmail] = useState(() => resolvePersonalDetailsEmail(userData));
   const [isLoading, setIsLoading] = useState(false);
-  const phoneNumber = userData.phoneNumber;
+  const phoneNumber =
+    userData.loginMethod === 'email'
+      ? ''
+      : userData.loginContact || userData.phoneNumber || '';
   const profilePhotoUri = params.selfieUri as string | null;
   const vehicleType = params.vehicleType as string;
   const vehicleNumber = params.vehicleNumber as string | null;
@@ -59,6 +78,11 @@ export default function PersonalDetailsScreen() {
   
   const [nameError, setNameError] = useState('');
   const [emailError, setEmailError] = useState('');
+
+  useEffect(() => {
+    setName(isDefaultName(userData.name) ? '' : (userData.name || ''));
+    setEmail(resolvePersonalDetailsEmail(userData));
+  }, [userData.loginMethod, userData.loginContact, userData.email, userData.name]);
 
   const handleBack = () => {
     goBackOrReplace(router, resolvePersonalDetailsFallback(returnTo));
@@ -113,28 +137,29 @@ export default function PersonalDetailsScreen() {
       return;
     }
 
+    if (!userData.riderId) {
+      Alert.alert('Session expired', 'Please log in again.');
+      router.replace('/login');
+      return;
+    }
+
     try {
       setIsLoading(true);
 
-      // Call API to update rider profile in MongoDB
-      if (userData.riderId) {
-        await updateRider(userData.riderId, {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-        });
-      }
+      await updateRider(userData.riderId, {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+      });
 
-      // Update context state
       updateUserData({
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        phoneNumber: phoneNumber as string,
+        phoneNumber: userData.loginMethod === 'email' ? '' : phoneNumber,
         profilePhotoUri: profilePhotoUri,
         vehicleType: vehicleType,
         vehicleNumber: vehicleNumber,
       });
 
-      // Navigate to KYC upload screen
       router.replace('/kyc-upload');
     } catch (error: any) {
       console.error('Error updating personal details:', error);

@@ -27,6 +27,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import Header from '../components/layout/Header';
 import { Theme } from '../constants/Theme';
 import { useUser } from '../contexts';
+import { profileEmailDisplay, profilePhoneDisplay } from '@/utils/loginContact';
 import { deleteAccount } from '../api/auth';
 import { getRider, getRiderStats } from '../api/rider';
 import { getEarningsSummary } from '../api/payouts';
@@ -99,14 +100,28 @@ export default function ProfileScreen() {
   const riderData = useMemo(() => {
     const rawName = riderProfile?.name ?? userData.name ?? 'Rider Name';
     const isPlaceholder = !rawName || rawName === 'Rider Name' || (rawName.startsWith('Rider ') && /^\d{4}$/.test(rawName.substring(6)));
-    
+    const loginMethod = userData.loginMethod;
+    const loginContact = userData.loginContact;
+    const rawPhone = riderProfile?.phoneNumber ?? userData.phoneNumber ?? '';
+    const rawEmail = riderProfile?.email ?? userData.email ?? '';
+    const phone = profilePhoneDisplay(loginMethod, rawPhone);
+    const email = profileEmailDisplay(loginMethod, rawEmail);
+
+    const primaryContact =
+      loginMethod === 'email'
+        ? loginContact || email
+        : loginMethod === 'whatsapp'
+          ? loginContact || phone
+          : loginContact || phone;
+
     return {
       name: isPlaceholder ? '-' : rawName,
       riderId: userData.riderId ?? riderProfile?.riderId ?? '—',
       rating: riderStats?.stats?.averageRating ?? riderProfile?.stats?.averageRating ?? 0,
       deliveries: lifetimeSummary?.orderCount ?? riderStats?.stats?.completedDeliveries ?? 0,
-      phone: riderProfile?.phoneNumber ?? userData.phoneNumber ?? '—',
-      email: riderProfile?.email ?? userData.email ?? '—',
+      phone: loginMethod === 'email' ? '—' : primaryContact !== '—' ? primaryContact : phone,
+      email: loginMethod === 'email' ? (primaryContact !== '—' ? primaryContact : email) : email,
+      loginMethod,
       floatingCash: riderStats?.floatingCash ?? riderProfile?.earnings?.pendingAmount ?? 0,
       stats: {
         acceptanceRate: riderStats?.stats?.acceptanceRate ?? '—',
@@ -260,18 +275,22 @@ export default function ProfileScreen() {
 
             {/* Contact Info */}
             <View style={profileStyles.contactSection}>
-              <View style={profileStyles.contactRow}>
-                <PhoneIcon size={scale(16)} color={Theme.colors.primaryMedium} />
-                <Text variant="bodySm" color={Theme.colors.textGrey} style={profileStyles.contactText}>
-                  {riderData.phone}
-                </Text>
-              </View>
-              <View style={profileStyles.contactRow}>
-                <EmailIcon size={scale(16)} color={Theme.colors.primaryMedium} />
-                <Text variant="bodySm" color={Theme.colors.textGrey} style={profileStyles.contactText}>
-                  {riderData.email}
-                </Text>
-              </View>
+              {riderData.loginMethod !== 'email' ? (
+                <View style={profileStyles.contactRow}>
+                  <PhoneIcon size={scale(16)} color={Theme.colors.primaryMedium} />
+                  <Text variant="bodySm" color={Theme.colors.textGrey} style={profileStyles.contactText}>
+                    {riderData.loginMethod === 'whatsapp' ? `WhatsApp: ${riderData.phone}` : riderData.phone}
+                  </Text>
+                </View>
+              ) : null}
+              {riderData.loginMethod === 'email' || (riderData.email && riderData.email !== '—') ? (
+                <View style={profileStyles.contactRow}>
+                  <EmailIcon size={scale(16)} color={Theme.colors.primaryMedium} />
+                  <Text variant="bodySm" color={Theme.colors.textGrey} style={profileStyles.contactText}>
+                    {riderData.loginMethod === 'email' ? riderData.email : riderData.email}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
         </View>
@@ -350,7 +369,7 @@ export default function ProfileScreen() {
           <View style={profileStyles.statsGrid}>
             <View style={profileStyles.statsRow}>
               <View style={profileStyles.statCard}>
-                <Text variant="h2" color="#32C96A" style={profileStyles.statValue}>
+                <Text variant="h2" color="#237227" style={profileStyles.statValue}>
                   {riderData.stats.acceptanceRate}
                 </Text>
                 <Text variant="bodySm" color="#6A7282" style={profileStyles.statLabel}>
@@ -358,7 +377,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <View style={profileStyles.statCard}>
-                <Text variant="h2" color="#32C96A" style={profileStyles.statValue}>
+                <Text variant="h2" color="#237227" style={profileStyles.statValue}>
                   {riderData.stats.onTimeDelivery}
                 </Text>
                 <Text variant="bodySm" color="#6A7282" style={profileStyles.statLabel}>
@@ -368,7 +387,7 @@ export default function ProfileScreen() {
             </View>
             <View style={profileStyles.statsRow}>
               <View style={profileStyles.statCard}>
-                <Text variant="h2" color="#32C96A" style={profileStyles.statValue}>
+                <Text variant="h2" color="#237227" style={profileStyles.statValue}>
                   {riderData.stats.totalOnlineTime}
                 </Text>
                 <Text variant="bodySm" color="#6A7282" style={profileStyles.statLabel}>
@@ -376,7 +395,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <View style={profileStyles.statCard}>
-                <Text variant="h2" color="#32C96A" style={profileStyles.statValue}>
+                <Text variant="h2" color="#237227" style={profileStyles.statValue}>
                   {riderData.stats.lifetimeEarnings}
                 </Text>
                 <Text variant="bodySm" color="#6A7282" style={profileStyles.statLabel}>

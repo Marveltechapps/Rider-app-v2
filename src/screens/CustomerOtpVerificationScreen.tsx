@@ -265,7 +265,7 @@ export default function CustomerOtpVerificationScreen() {
                 {phoneDisplay ? ` (${phoneDisplay})` : ''}, then enter the code they share with you.
               </Text>
             ) : (
-              <Text variant="bodySm" color="#32C96A">
+              <Text variant="bodySm" color="#237227">
                 OTP sent to customer mobile number
               </Text>
             )}
@@ -280,7 +280,7 @@ export default function CustomerOtpVerificationScreen() {
             {verifying ? (
               <View style={styles.statusRow}>
                 <ActivityIndicator size="small" color={Theme.colors.primaryMedium} />
-                <Text variant="bodySm" color="#32C96A">Verifying OTP…</Text>
+                <Text variant="bodySm" color="#237227">Verifying OTP…</Text>
               </View>
             ) : null}
 

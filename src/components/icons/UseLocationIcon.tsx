@@ -16,7 +16,7 @@ interface UseLocationIconProps {
 
 export default function UseLocationIcon({
   size = 11,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: UseLocationIconProps) {
   return (

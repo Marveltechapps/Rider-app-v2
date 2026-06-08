@@ -99,7 +99,7 @@ const deliveryScreenStyles = StyleSheet.create({
   customerAvatarContainer: {
     width: scale(49),
     height: scale(49),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderRadius: scale(14),
     justifyContent: 'center',
     alignItems: 'center',

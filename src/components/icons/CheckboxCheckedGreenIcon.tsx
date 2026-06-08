@@ -39,7 +39,7 @@ export default function CheckboxCheckedGreenIcon({
         width="14"
         height="14"
         rx="4"
-        fill="#32C96A"
+        fill="#237227"
       />
       {/* Checkmark */}
       <Path

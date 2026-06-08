@@ -293,9 +293,9 @@ export default function SelectHubScreen() {
                   disabled={locationLoading}
                 >
                   {locationLoading ? (
-                    <ActivityIndicator size="small" color="#32C96A" />
+                    <ActivityIndicator size="small" color="#237227" />
                   ) : (
-                    <UseLocationIcon size={scale(10.5)} color="#32C96A" />
+                    <UseLocationIcon size={scale(10.5)} color="#237227" />
                   )}
                   <Text style={styles.useLocationText}>
                     {locationLoading ? 'Getting location…' : 'Use my location'}
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   useLocationText: {
     fontSize: scale(12.25),
     lineHeight: scale(17.5),
-    color: '#32C96A',
+    color: '#237227',
     fontFamily: Theme.typography.body.fontFamily,
     fontWeight: '400',
   },
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     height: scale(42),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
   },
   useThisLocationButton: {
     height: scale(42),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',

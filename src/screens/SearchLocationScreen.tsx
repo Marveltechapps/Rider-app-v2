@@ -392,9 +392,9 @@ export default function SearchLocationScreen() {
                 disabled={locationLoading}
               >
                 {locationLoading ? (
-                  <ActivityIndicator size="small" color="#32C96A" />
+                  <ActivityIndicator size="small" color="#237227" />
                 ) : (
-                  <LocationIcon size={scale(18)} color="#32C96A" />
+                  <LocationIcon size={scale(18)} color="#237227" />
                 )}
                 <Text style={styles.detectLocationText}>
                   {locationLoading ? 'Detecting…' : 'Use my location'}
@@ -508,7 +508,7 @@ export default function SearchLocationScreen() {
                 </MapView>
               ) : (
                 <View style={styles.mapWebFallback}>
-                  <LocationIcon size={scale(48)} color="#32C96A" />
+                  <LocationIcon size={scale(48)} color="#237227" />
                   <Text variant="body" color={Theme.colors.textGrey} style={styles.mapWebText}>
                     Map view is available in the app (iOS/Android). Your detected city: {detectedCity?.name ?? '—'}
                   </Text>
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   detectLocationText: {
-    color: '#32C96A', // Exact Figma green
+    color: '#237227', // Exact Figma green
     fontSize: scale(14),
     lineHeight: scale(21), // 14 * 1.5
     fontFamily: Theme.typography.body.fontFamily,
@@ -776,7 +776,7 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     height: scale(42),
-    backgroundColor: '#32C96A', // Exact Figma green when enabled
+    backgroundColor: '#237227', // Exact Figma green when enabled
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
   },
   useLocationButton: {
     height: scale(42),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',

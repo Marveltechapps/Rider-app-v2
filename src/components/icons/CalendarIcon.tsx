@@ -15,7 +15,7 @@ interface CalendarIconProps {
 
 export default function CalendarIcon({ 
   size = 14, 
-  color = '#32C96A',
+  color = '#237227',
   style 
 }: CalendarIconProps) {
   return (

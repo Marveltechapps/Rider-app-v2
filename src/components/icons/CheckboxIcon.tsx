@@ -32,8 +32,8 @@ export default function CheckboxIcon({
           width="13"
           height="13"
           rx="1"
-          fill="#32C96A"
-          stroke="#32C96A"
+          fill="#237227"
+          stroke="#237227"
           strokeWidth="1"
         />
         <Path

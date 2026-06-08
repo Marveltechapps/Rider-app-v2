@@ -62,9 +62,9 @@ const documentsStyles = StyleSheet.create({
     gap: verticalScale(8),
     paddingVertical: verticalScale(20),
     paddingHorizontal: scale(16),
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
     borderRadius: scale(8),
-    shadowColor: '#32C96A',
+    shadowColor: '#237227',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
@@ -256,7 +256,7 @@ const documentsStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   statusBadgeVerified: {
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     minWidth: scale(72),
   },
   statusBadgePending: {
@@ -288,7 +288,7 @@ const documentsStyles = StyleSheet.create({
     height: scale(14),
   },
   statusTextVerified: {
-    color: '#32C96A',
+    color: '#237227',
   },
   statusTextPending: {
     color: '#FF6900',
@@ -320,7 +320,7 @@ const documentsStyles = StyleSheet.create({
     alignItems: 'center',
   },
   segmentActive: {
-    backgroundColor: '#32C96A',
+    backgroundColor: '#237227',
   },
   segmentInactive: {
     backgroundColor: 'transparent',

@@ -15,7 +15,7 @@ interface CustomerAvatarIconProps {
 
 export default function CustomerAvatarIcon({
   size = 28,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: CustomerAvatarIconProps) {
   // Use 56x56 viewBox for handover screen, but scale to provided size

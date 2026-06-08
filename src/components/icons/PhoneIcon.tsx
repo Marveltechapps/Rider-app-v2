@@ -15,7 +15,7 @@ interface PhoneIconProps {
 
 export default function PhoneIcon({ 
   size = 18, 
-  color = '#32C96A',
+  color = '#237227',
   style 
 }: PhoneIconProps) {
   return (

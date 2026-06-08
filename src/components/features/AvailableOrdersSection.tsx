@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   badge: {
     paddingVertical: scale(1.75),
     paddingHorizontal: scale(7),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderWidth: 1,
     borderColor: 'transparent',
     borderRadius: scale(6.75),

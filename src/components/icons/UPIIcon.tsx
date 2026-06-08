@@ -15,7 +15,7 @@ interface UPIIconProps {
 
 export default function UPIIcon({
   size = 24,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: UPIIconProps) {
   return (

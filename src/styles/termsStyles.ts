@@ -124,7 +124,7 @@ const termsStyles = StyleSheet.create({
     fontSize: scale(14),
     fontWeight: '600',
     lineHeight: scale(21),
-    color: '#32C96A',
+    color: '#237227',
     marginTop: verticalScale(8),
   },
 

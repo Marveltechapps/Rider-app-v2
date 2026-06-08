@@ -15,7 +15,7 @@ interface CashDepositedIconProps {
 
 export default function CashDepositedIcon({
   size = 18,
-  color = '#32C96A',
+  color = '#237227',
   style,
 }: CashDepositedIconProps) {
   return (

@@ -275,9 +275,9 @@ const styles = StyleSheet.create({
     gap: scale(7),
     paddingVertical: scale(7),
     paddingLeft: scale(7),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(50, 201, 106, 0.2)',
+    borderColor: 'rgba(35, 114, 39, 0.2)',
     borderRadius: scale(8),
   },
   incentiveText: {

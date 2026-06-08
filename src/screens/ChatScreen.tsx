@@ -145,7 +145,7 @@ export default function ChatScreen() {
       <SafeAreaView style={chatStyles.container} edges={['top', 'bottom']}>
         <Header title="Live Chat Support" onBack={() => router.back()} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#32C96A" />
+          <ActivityIndicator size="large" color="#237227" />
         </View>
       </SafeAreaView>
     );

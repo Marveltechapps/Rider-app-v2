@@ -58,7 +58,7 @@ const earningsStyles = StyleSheet.create({
     paddingVertical: scale(20),
     paddingHorizontal: scale(16),
     gap: scale(8),
-    // Shadow: 0px 4px 6px -4px rgba(50, 201, 106, 0.2), 0px 10px 15px -3px rgba(50, 201, 106, 0.2)
+    // Shadow: 0px 4px 6px -4px rgba(35, 114, 39, 0.2), 0px 10px 15px -3px rgba(35, 114, 39, 0.2)
     shadowColor: Theme.colors.primaryMedium,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -214,7 +214,7 @@ const earningsStyles = StyleSheet.create({
     paddingVertical: scale(12),
     paddingHorizontal: scale(24),
     gap: scale(16),
-    // Shadow: 0px 4px 6px -4px rgba(50, 201, 106, 0.2), 0px 10px 15px -3px rgba(50, 201, 106, 0.2)
+    // Shadow: 0px 4px 6px -4px rgba(35, 114, 39, 0.2), 0px 10px 15px -3px rgba(35, 114, 39, 0.2)
     shadowColor: Theme.colors.primaryMedium,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -264,7 +264,7 @@ const earningsStyles = StyleSheet.create({
     width: scale(28),
     height: scale(28),
     borderRadius: scale(14),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
@@ -292,7 +292,7 @@ const earningsStyles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: verticalScale(4),
     paddingHorizontal: scale(12), // Fixed: 10.5 → 12 (8px spacing system)
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     borderRadius: scale(8.75),
     justifyContent: 'center',
     alignItems: 'center',
@@ -380,7 +380,7 @@ const earningsStyles = StyleSheet.create({
     width: scale(42),
     height: scale(42),
     borderRadius: scale(12.75),
-    backgroundColor: 'rgba(50, 201, 106, 0.1)',
+    backgroundColor: 'rgba(35, 114, 39, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },

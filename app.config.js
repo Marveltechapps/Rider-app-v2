@@ -53,6 +53,7 @@ module.exports = {
     ...appJson.expo,
     plugins: [
       ...(appJson.expo.plugins || []),
+      'expo-font',
       [
         'expo-location',
         {
